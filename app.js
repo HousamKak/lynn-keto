@@ -736,54 +736,6 @@ function renderInsights() {
   `;
 }
 
-// ---------- PWA install prompt ----------
-let deferredInstallPrompt = null;
-function setupInstallBanner() {
-  const banner = document.getElementById("installBanner");
-  if (!banner) return;
-  const dismissed = localStorage.getItem("lynn-keto-install-dismissed");
-  const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  if (dismissed || isStandalone) return;
-
-  const iconEl = document.getElementById("installBannerIcon");
-  const sub = document.getElementById("installBannerSub");
-  const confirm = document.getElementById("installConfirm");
-  const dismiss = document.getElementById("installDismiss");
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-  const show = (withPromptBtn) => {
-    if (iconEl) iconEl.innerHTML = isIOS ? ICONS.share : ICONS.download;
-    if (sub && isIOS) sub.textContent = t(UI.install_ios_hint);
-    if (!withPromptBtn && confirm) confirm.style.display = "none";
-    banner.classList.add("show");
-  };
-
-  dismiss.addEventListener("click", () => {
-    localStorage.setItem("lynn-keto-install-dismissed", "1");
-    banner.classList.remove("show");
-  });
-
-  confirm.addEventListener("click", async () => {
-    if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      const { outcome } = await deferredInstallPrompt.userChoice;
-      if (outcome === "accepted") {
-        banner.classList.remove("show");
-      }
-      deferredInstallPrompt = null;
-    }
-  });
-
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    show(true);
-  });
-
-  if (isIOS) show(false);
-}
-
 // ---------- Render all ----------
 function renderAll() {
   renderToday();
@@ -801,7 +753,6 @@ function renderAll() {
 
 // ---------- INIT ----------
 applyLanguage();
-setupInstallBanner();
 
 // ---------- Service Worker ----------
 if ("serviceWorker" in navigator) {
