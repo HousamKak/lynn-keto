@@ -238,7 +238,6 @@ const DINNER = BREAKFAST.map(b => ({ ...b, id: "d" + b.id.slice(1) }));
 // ---------- SNACK 1 (7) ----------
 const SNACK1 = [
   { id:"s1-1", num:{ar:"الأول",en:"First"}, items:[{ar:"كوب من الجلو لايت (Jello diet)",en:"1 cup Jello diet"}] },
-  { id:"s1-2", num:{ar:"الثاني",en:"Second"}, items:[{ar:"1/2 علبة من الريد بول لايت",en:"1/2 can Red Bull Light"}] },
   { id:"s1-4", num:{ar:"الرابع",en:"Fourth"}, items:[{ar:"3 علكات خالية من السكر محلاة بالـ xylitol",en:"3 pieces sugar-free gum sweetened with xylitol"}] },
   { id:"s1-5", num:{ar:"الخامس",en:"Fifth"}, items:[{ar:"3 حلوى (بونبون) خالية من السكر محلاة بالـ xylitol",en:"3 sugar-free candies (bon-bons) sweetened with xylitol"}] },
   { id:"s1-6", num:{ar:"السادس",en:"Sixth"}, items:[
@@ -336,7 +335,7 @@ const SHOPPING = [
     {ar:"بابونج",en:"Chamomile"},{ar:"قهوة",en:"Coffee"},{ar:"نسكافيه",en:"Nescafé"},
     {ar:"كوفي مايت كامل الدسم",en:"Full-fat Coffee-Mate"},{ar:"حليب اللوز غير المحلى",en:"Unsweetened almond milk"},
     {ar:"حليب جوز الهند غير المحلى",en:"Unsweetened coconut milk"},{ar:"مياه غازية (صودا)",en:"Sparkling water (soda)"},
-    {ar:"مشروبات غازية دايت",en:"Diet sodas"},{ar:"ريد بول لايت (Red Bull Light)",en:"Red Bull Light"},
+    {ar:"مشروبات غازية دايت",en:"Diet sodas"},
     {ar:"سكر اصطناعي (Canderel/Sucralose)",en:"Artificial sweetener (Canderel/Sucralose)"}
   ]},
   { title:{ar:"🍓 الفواكه المسموحة",en:"🍓 Allowed fruits"}, items:[
