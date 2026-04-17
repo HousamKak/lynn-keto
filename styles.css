@@ -506,6 +506,38 @@ header { position: relative; }
 .note.info { border-inline-end-color: var(--blue); }
 [dir="ltr"] .water-tracker { direction: ltr; }
 
+/* ---------- Locked one-time field (e.g. start date after saving) ---------- */
+.locked-field {
+  background: var(--green-soft);
+  border: 1px solid #b7e0c9;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 6px;
+}
+.locked-field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.locked-field-icon { font-size: 28px; }
+.locked-field-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.locked-field-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--green);
+}
+.locked-field-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 /* ---------- Password gate ---------- */
 .gate-overlay {
   position: fixed;

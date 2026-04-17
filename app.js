@@ -530,12 +530,17 @@ document.getElementById("saveStartDate").addEventListener("click", () => {
   alert(t(UI.start_saved));
 });
 function renderStartDateDisplay() {
-  const el = document.getElementById("startDateDisplay");
-  if (!el) return;
+  const setter = document.getElementById("startDateSetter");
+  const locked = document.getElementById("startDateLocked");
+  const lockedVal = document.getElementById("startDateLockedValue");
+  if (!setter || !locked) return;
   if (state.startDate) {
-    el.innerHTML = `<strong>${t(UI.start_date_saved_label)}</strong> ${formatDate(state.startDate)}`;
+    setter.style.display = "none";
+    locked.style.display = "block";
+    lockedVal.textContent = formatDate(state.startDate);
   } else {
-    el.textContent = t(UI.start_date_none);
+    setter.style.display = "";
+    locked.style.display = "none";
   }
 }
 function renderPersonInfo() {

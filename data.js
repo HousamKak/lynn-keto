@@ -466,6 +466,8 @@ const UI = {
   start_date: { ar:"تاريخ بدء النظام", en:"Plan start date" },
   start_date_saved_label: { ar:"التاريخ المحفوظ:", en:"Saved date:" },
   start_date_none: { ar:"لم يُحفظ بعد", en:"Not saved yet" },
+  start_date_active_label: { ar:"النظام نشط منذ", en:"Plan active since" },
+  start_date_locked_hint: { ar:"لا يمكن تغيير تاريخ البدء بعد حفظه. لإعادة تشغيل النظام، استخدمي زر \"مسح جميع البيانات\" في الأسفل.", en:"The start date cannot be changed once saved. To restart the plan, use the \"Reset all data\" button below." },
   btn_save: { ar:"حفظ", en:"Save" },
   start_saved: { ar:"تم حفظ تاريخ البدء ✅", en:"Start date saved ✅" },
   choose_date: { ar:"اختاري تاريخ", en:"Choose a date" },
