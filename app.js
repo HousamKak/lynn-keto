@@ -526,9 +526,18 @@ document.getElementById("saveStartDate").addEventListener("click", () => {
   const v = document.getElementById("startDateInput").value;
   if (!v) { alert(t(UI.choose_date)); return; }
   state.startDate = v;
-  saveState(); renderToday(); renderCalendar();
+  saveState(); renderToday(); renderCalendar(); renderStartDateDisplay();
   alert(t(UI.start_saved));
 });
+function renderStartDateDisplay() {
+  const el = document.getElementById("startDateDisplay");
+  if (!el) return;
+  if (state.startDate) {
+    el.innerHTML = `<strong>${t(UI.start_date_saved_label)}</strong> ${formatDate(state.startDate)}`;
+  } else {
+    el.textContent = t(UI.start_date_none);
+  }
+}
 function renderPersonInfo() {
   const c = document.getElementById("personInfo");
   const items = [
@@ -583,6 +592,7 @@ function renderAll() {
   renderFavorites();
   renderPhotos();
   renderPersonInfo();
+  renderStartDateDisplay();
 }
 
 // ---------- INIT ----------

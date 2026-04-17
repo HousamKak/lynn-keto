@@ -464,6 +464,8 @@ const UI = {
   // Settings
   settings_header: { ar:"⚙️ الإعدادات", en:"⚙️ Settings" },
   start_date: { ar:"تاريخ بدء النظام", en:"Plan start date" },
+  start_date_saved_label: { ar:"التاريخ المحفوظ:", en:"Saved date:" },
+  start_date_none: { ar:"لم يُحفظ بعد", en:"Not saved yet" },
   btn_save: { ar:"حفظ", en:"Save" },
   start_saved: { ar:"تم حفظ تاريخ البدء ✅", en:"Start date saved ✅" },
   choose_date: { ar:"اختاري تاريخ", en:"Choose a date" },
