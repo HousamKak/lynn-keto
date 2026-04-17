@@ -53,16 +53,16 @@ function daysBetween(a, b) {
 }
 const AR_MONTHS = ["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
 const AR_DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const EN_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const EN_DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 function formatDate(iso) {
   const d = new Date(iso);
-  if (lang === "en") {
-    return d.toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
-  }
-  const day = AR_DAYS[d.getDay()];
   const date = d.getDate();
-  const month = AR_MONTHS[d.getMonth()];
   const year = d.getFullYear();
-  return `${day}، ${date} ${month} ${year}`;
+  if (lang === "en") {
+    return `${EN_DAYS[d.getDay()]}, ${date} ${EN_MONTHS[d.getMonth()]} ${year}`;
+  }
+  return `${AR_DAYS[d.getDay()]}، ${date} ${AR_MONTHS[d.getMonth()]} ${year}`;
 }
 function dayNumber() {
   if (!state.startDate) return null;
