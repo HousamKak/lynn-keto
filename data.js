@@ -374,12 +374,12 @@ const UI = {
 
   // Today
   todayHeader: { ar:"🏠 يومك اليوم", en:"🏠 Your day today" },
-  stat_day: { ar:"اليوم من ٢٨", en:"Day of 28" },
+  stat_day: { ar:"اليوم من 28", en:"Day of 28" },
   stat_streak: { ar:"أيام متتالية", en:"Streak days" },
   stat_water: { ar:"كاسات ماء", en:"Water cups" },
   stat_meals: { ar:"وجبات اليوم", en:"Meals today" },
   water_header: { ar:"💧 شرب الماء", en:"💧 Water intake" },
-  water_sub: { ar:"اضغطي على الكاس لتملي — الهدف ٨ كاسات يومياً", en:"Tap a cup to fill it — target is 8 cups per day" },
+  water_sub: { ar:"اضغطي على الكاس لتملي — الهدف 8 كاسات يومياً", en:"Tap a cup to fill it — target is 8 cups per day" },
   meals_today: { ar:"🍽️ وجبات اليوم", en:"🍽️ Today's meals" },
   timing_header: { ar:"⏰ التوقيتات المقترحة", en:"⏰ Suggested schedule" },
   timing_note: { ar:"لا يوجد مواقيت محددة — وزّعي الوجبات حسب رغبتك خلال النهار.", en:"No fixed times — spread meals throughout the day as you wish." },
@@ -388,17 +388,17 @@ const UI = {
   time_lunch: { ar:"🍽️ الغداء", en:"🍽️ Lunch" },
   time_snack2: { ar:"🥤 السناك الثاني", en:"🥤 Second snack" },
   time_dinner: { ar:"🌙 العشاء", en:"🌙 Dinner" },
-  t_range_1: { ar:"٧-٩ ص", en:"7-9 AM" },
-  t_range_2: { ar:"١١ ص", en:"11 AM" },
-  t_range_3: { ar:"١-٢ م", en:"1-2 PM" },
-  t_range_4: { ar:"٤:٣٠ م", en:"4:30 PM" },
-  t_range_5: { ar:"٧:٣٠ م", en:"7:30 PM" },
+  t_range_1: { ar:"7-9 ص", en:"7-9 AM" },
+  t_range_2: { ar:"11 ص", en:"11 AM" },
+  t_range_3: { ar:"1-2 م", en:"1-2 PM" },
+  t_range_4: { ar:"4:30 م", en:"4:30 PM" },
+  t_range_5: { ar:"7:30 م", en:"7:30 PM" },
 
   meal_breakfast: { ar:"الفطور", en:"Breakfast" },
   meal_lunch: { ar:"الغداء", en:"Lunch" },
   meal_dinner: { ar:"العشاء", en:"Dinner" },
-  meal_snack1: { ar:"سناك ١", en:"Snack 1" },
-  meal_snack2: { ar:"سناك ٢", en:"Snack 2" },
+  meal_snack1: { ar:"سناك 1", en:"Snack 1" },
+  meal_snack2: { ar:"سناك 2", en:"Snack 2" },
   meal_done: { ar:"✅ تم", en:"✅ Done" },
   meal_not_done: { ar:"لم يتم بعد", en:"Not done yet" },
   btn_done: { ar:"✓ تم", en:"✓ Done" },
@@ -416,9 +416,9 @@ const UI = {
   chart_goal: { ar:"الهدف (IBW)", en:"Goal (IBW)" },
 
   // Calendar
-  cal_header: { ar:"📅 تقويم ٢٨ يوم", en:"📅 28-day calendar" },
+  cal_header: { ar:"📅 تقويم 28 يوم", en:"📅 28-day calendar" },
   cal_note: { ar:"كل مربع يعرض عدد الوجبات + الماء التي أتممتيها ذلك اليوم. اضغطي على أي يوم لعرض التفاصيل.", en:"Each square shows meals + water completed that day. Tap a day for details." },
-  cal_legend: { ar:"اللون الأخضر = يوم مكتمل ٦/٦ · الأصفر = يوم جزئي · الرمادي = لم يُسجّل", en:"Green = fully complete 6/6 · Yellow = partial · Gray = not logged" },
+  cal_legend: { ar:"اللون الأخضر = يوم مكتمل 6/6 · الأصفر = يوم جزئي · الرمادي = لم يُسجّل", en:"Green = fully complete 6/6 · Yellow = partial · Gray = not logged" },
   cal_no_start: { ar:"حددي تاريخ بدء النظام من الإعدادات أولاً.", en:"Set the start date from Settings first." },
 
   // Meals

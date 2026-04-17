@@ -19,9 +19,7 @@ function tUI(key, vars) {
   return s;
 }
 function localizedNumber(n) {
-  if (lang === "en") return String(n);
-  const map = "٠١٢٣٤٥٦٧٨٩";
-  return String(n).replace(/\d/g, d => map[+d]);
+  return String(n);
 }
 
 // ---------- Storage ----------
@@ -53,10 +51,18 @@ function today() {
 function daysBetween(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
+const AR_MONTHS = ["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
+const AR_DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
 function formatDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString(lang === "en" ? "en-US" : "ar-EG",
-    { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  if (lang === "en") {
+    return d.toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  }
+  const day = AR_DAYS[d.getDay()];
+  const date = d.getDate();
+  const month = AR_MONTHS[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day}، ${date} ${month} ${year}`;
 }
 function dayNumber() {
   if (!state.startDate) return null;
