@@ -503,5 +503,37 @@ const UI = {
   modal_random_title: { ar:"اختيار عشوائي", en:"Random pick" },
   day_label: { ar:"اليوم", en:"Day" },
   date_value_invalid: { ar:"أدخلي تاريخ ووزن صحيح", en:"Enter a valid date and weight" },
-  btn_lang: { ar:"EN", en:"عربي" }
+  btn_lang: { ar:"EN", en:"عربي" },
+
+  // Empty states
+  empty_weight_title: { ar:"لم تسجلي وزنك بعد", en:"No weight logged yet" },
+  empty_weight_sub: { ar:"سجّلي وزنك الأول لتبدأ متابعة تقدمك على المخطط.", en:"Log your first weight to start tracking progress on the chart." },
+  empty_favs_title: { ar:"لا توجد وجبات مفضلة بعد", en:"No favorite meals yet" },
+  empty_favs_sub: { ar:"اضغطي على أيقونة القلب في أي خيار من الوجبات لحفظه هنا.", en:"Tap the heart icon on any meal option to save it here for quick access." },
+  empty_photos_title: { ar:"لا توجد صور بعد", en:"No photos yet" },
+  empty_photos_sub: { ar:"احفظي صور 'قبل' و 'بعد' لرؤية تقدمك البصري خلال 28 يوماً.", en:"Save 'before' and 'after' photos to see your visual progress across 28 days." },
+
+  // Install banner
+  install_title: { ar:"أضيفي التطبيق إلى الشاشة الرئيسية", en:"Add to your home screen" },
+  install_sub: { ar:"استخدمي التطبيق كأنه تطبيق حقيقي — بدون فتح المتصفح.", en:"Use it like a real app — without opening the browser." },
+  install_cta: { ar:"تثبيت", en:"Install" },
+  install_ios_hint: { ar:"اضغطي على زر المشاركة في سفاري ثم 'إضافة إلى الشاشة الرئيسية'.", en:"Tap the Share button in Safari, then 'Add to Home Screen'." },
+  dismiss: { ar:"لاحقاً", en:"Later" },
+
+  // Milestones & celebrations
+  milestone_3_title: { ar:"3 أيام متتالية! 🎉", en:"3-day streak! 🎉" },
+  milestone_3_sub: { ar:"بدأتِ بقوة. استمري!", en:"Strong start. Keep going!" },
+  milestone_7_title: { ar:"أسبوع كامل! 🔥", en:"A full week! 🔥" },
+  milestone_7_sub: { ar:"ربع الطريق. أنتِ رائعة.", en:"Quarter of the way there. You're amazing." },
+  milestone_14_title: { ar:"أسبوعان متتاليان! ⭐", en:"Two weeks in a row! ⭐" },
+  milestone_14_sub: { ar:"نصف الطريق — استمري على هذا النحو.", en:"Halfway there — keep this momentum." },
+  milestone_28_title: { ar:"أتممتِ الـ 28 يوماً! 👑", en:"28 days complete! 👑" },
+  milestone_28_sub: { ar:"أنتِ بطلة. هذا إنجاز حقيقي.", en:"You're a champion. This is a real achievement." },
+
+  // Weekly insights
+  insights_header: { ar:"📊 هذا الأسبوع", en:"📊 This week" },
+  insights_days: { ar:"أيام مكتملة", en:"Days complete" },
+  insights_water: { ar:"كاسات ماء", en:"Water cups" },
+  insights_weight_change: { ar:"تغيّر الوزن", en:"Weight change" },
+  insights_empty: { ar:"لا توجد بيانات هذا الأسبوع بعد.", en:"No data for this week yet." }
 };

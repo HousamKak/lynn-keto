@@ -81,11 +81,70 @@ function injectTabIcons() {
   document.querySelectorAll(".tab[data-tab]").forEach(tab => {
     const key = TAB_ICONS[tab.dataset.tab];
     if (!key || !ICONS[key]) return;
-    if (tab.querySelector("svg")) return; // already injected
-    // Strip any leading emoji from the existing label and prepend SVG
     const raw = tab.textContent.replace(/^[^\p{L}\p{N}]+/u, "").trim();
     tab.innerHTML = ICONS[key] + '<span class="tab-label">' + raw + '</span>';
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", tab.classList.contains("active") ? "true" : "false");
+    tab.setAttribute("aria-controls", tab.dataset.tab);
+    tab.setAttribute("aria-label", raw);
   });
+}
+
+// ---------- Toast / celebration ----------
+function toast(title, sub, variant) {
+  const host = document.getElementById("toastHost");
+  if (!host) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (variant ? " " + variant : "");
+  el.innerHTML = sub
+    ? `<div><div class="toast-title">${title}</div><div class="toast-sub">${sub}</div></div>`
+    : `<div class="toast-title">${title}</div>`;
+  host.appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3800);
+}
+
+function confettiBurst() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const host = document.getElementById("confettiHost");
+  if (!host) return;
+  const colors = ["#8B5CF6","#059669","#EC4899","#F59E0B","#6366F1","#10B981"];
+  const count = 80;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti-piece";
+    const x = Math.random() * 100;
+    const dx = (Math.random() - 0.5) * 300;
+    const rot = (Math.random() - 0.5) * 1080;
+    const dur = 2200 + Math.random() * 1400;
+    const delay = Math.random() * 240;
+    p.style.left = x + "vw";
+    p.style.setProperty("--dx", dx + "px");
+    p.style.setProperty("--rot", rot + "deg");
+    p.style.setProperty("--dur", dur + "ms");
+    p.style.animationDelay = delay + "ms";
+    p.style.background = colors[i % colors.length];
+    p.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+    frag.appendChild(p);
+    setTimeout(() => p.remove(), dur + delay + 400);
+  }
+  host.appendChild(frag);
+}
+
+// ---------- Milestone detection ----------
+const MILESTONES = [3, 7, 14, 28];
+function maybeCelebrateStreak() {
+  const s = currentStreak();
+  const seen = JSON.parse(localStorage.getItem("lynn-keto-milestones") || "[]");
+  if (MILESTONES.includes(s) && !seen.includes(s)) {
+    seen.push(s);
+    localStorage.setItem("lynn-keto-milestones", JSON.stringify(seen));
+    const title = t(UI["milestone_" + s + "_title"]);
+    const sub = t(UI["milestone_" + s + "_sub"]);
+    toast(title, sub, "celebrate");
+    confettiBurst();
+    if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
+  }
 }
 
 // ---------- Language switch ----------
@@ -114,9 +173,13 @@ function applyLanguage() {
 // ---------- Tabs ----------
 document.querySelectorAll(".tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(t => {
+      t.classList.remove("active");
+      t.setAttribute("aria-selected", "false");
+    });
     document.querySelectorAll("section").forEach(s => s.classList.remove("active"));
     tab.classList.add("active");
+    tab.setAttribute("aria-selected", "true");
     document.getElementById(tab.dataset.tab).classList.add("active");
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (tab.dataset.tab === "weight") renderWeightChart();
@@ -148,39 +211,41 @@ function renderToday() {
   const wt = document.getElementById("waterTracker");
   wt.innerHTML = "";
   for (let i = 1; i <= 8; i++) {
-    const cup = document.createElement("div");
+    const cup = document.createElement("button");
+    cup.type = "button";
     cup.className = "water-cup" + (i <= dayData.water ? " filled" : "");
-    cup.textContent = i <= dayData.water ? "💧" : "";
+    cup.setAttribute("aria-label", `Cup ${i} of 8`);
+    cup.setAttribute("aria-pressed", i <= dayData.water ? "true" : "false");
     cup.addEventListener("click", () => {
       dayData.water = dayData.water >= i ? i - 1 : i;
-      saveState(); renderToday();
+      saveState(); renderToday(); maybeCelebrateStreak();
     });
     wt.appendChild(cup);
   }
 
   // Meals
   const mealOrder = [
-    ["breakfast","🍳","meal_breakfast"],
-    ["snack1","🥤","meal_snack1"],
-    ["lunch","🍽️","meal_lunch"],
-    ["snack2","🥜","meal_snack2"],
-    ["dinner","🌙","meal_dinner"]
+    ["breakfast","sunrise","meal_breakfast"],
+    ["snack1","droplet","meal_snack1"],
+    ["lunch","bowl","meal_lunch"],
+    ["snack2","cookie","meal_snack2"],
+    ["dinner","moon","meal_dinner"]
   ];
   const mealsDiv = document.getElementById("todayMeals");
   mealsDiv.innerHTML = "";
-  mealOrder.forEach(([key, icon, uiKey]) => {
+  mealOrder.forEach(([key, iconKey, uiKey]) => {
     const done = dayData.meals[key];
     const row = document.createElement("div");
     row.className = "meal-check" + (done ? " done" : "");
     row.innerHTML = `
-      <span class="meal-icon">${icon}</span>
+      <span class="meal-icon">${ICONS[iconKey] || ""}</span>
       <div class="meal-body">
         <div class="meal-title">${t(UI[uiKey])}</div>
         <div class="meal-sub">${done ? t(UI.meal_done) : t(UI.meal_not_done)}</div>
       </div>
       <div class="meal-actions">
-        <button class="btn-sm" data-random="${key}">🎲</button>
-        <button class="btn-sm ${done ? "" : "success"}" data-toggle="${key}">${done ? t(UI.btn_undo) : t(UI.btn_done)}</button>
+        <button class="btn-sm" data-random="${key}" aria-label="${t(UI.pick_for_me)}">🎲</button>
+        <button class="btn-sm ${done ? "" : "success"}" data-toggle="${key}" aria-pressed="${done}">${done ? t(UI.btn_undo) : t(UI.btn_done)}</button>
       </div>
     `;
     mealsDiv.appendChild(row);
@@ -189,7 +254,7 @@ function renderToday() {
     b.addEventListener("click", () => {
       const k = b.dataset.toggle;
       dayData.meals[k] = !dayData.meals[k];
-      saveState(); renderToday();
+      saveState(); renderToday(); renderCalendar(); maybeCelebrateStreak();
     });
   });
   mealsDiv.querySelectorAll("[data-random]").forEach(b => {
@@ -224,7 +289,7 @@ function renderMealList(containerId, meals) {
     div.innerHTML = `
       <div class="option-header">
         <div class="option-title">${t(UI.option_label)} ${t(m.num)}${title}</div>
-        <button class="fav-btn ${fav ? "active" : ""}" data-fav="${m.id}">${fav ? "❤️" : "🤍"}</button>
+        <button class="fav-btn ${fav ? "active" : ""}" data-fav="${m.id}" aria-label="${t(UI.fav_header)}" aria-pressed="${fav}">${fav ? ICONS.heartFilled : ICONS.heart}</button>
       </div>
       <div class="option-body">
         <ul>${m.items.map(x => `<li>${t(x)}</li>`).join("")}</ul>
@@ -347,18 +412,27 @@ document.getElementById("addWeight").addEventListener("click", () => {
 });
 
 function renderWeight() {
+  const entries = document.getElementById("weightEntries");
   if (state.weights.length === 0) {
     document.getElementById("currentWeight").textContent = "—";
     document.getElementById("weightLost").textContent = "—";
     document.getElementById("toGoal").textContent = "—";
-  } else {
+    entries.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">${ICONS.chartLine}</div>
+        <h4>${t(UI.empty_weight_title)}</h4>
+        <p>${t(UI.empty_weight_sub)}</p>
+      </div>`;
+    renderWeightChart();
+    return;
+  }
+  {
     const last = state.weights[state.weights.length - 1];
     const first = state.weights[0];
     document.getElementById("currentWeight").textContent = last.kg.toFixed(1);
     document.getElementById("weightLost").textContent = (first.kg - last.kg).toFixed(1);
     document.getElementById("toGoal").textContent = Math.max(0, (last.kg - PERSON.ibw)).toFixed(1);
   }
-  const entries = document.getElementById("weightEntries");
   entries.innerHTML = "";
   [...state.weights].reverse().forEach(w => {
     const row = document.createElement("div");
@@ -366,7 +440,7 @@ function renderWeight() {
     row.innerHTML = `
       <span>${formatDate(w.date)}</span>
       <span><strong>${w.kg.toFixed(1)} ${t(UI.kg)}</strong>
-        <button class="del" data-date="${w.date}">🗑️</button>
+        <button class="del" data-date="${w.date}" aria-label="Delete entry">${ICONS.trash}</button>
       </span>
     `;
     entries.appendChild(row);
@@ -453,7 +527,12 @@ function renderFavorites() {
   const favs = all.filter(m => state.favorites.includes(m.id));
   const c = document.getElementById("favoritesList");
   if (favs.length === 0) {
-    c.innerHTML = `<div class="note">${t(UI.fav_empty)}</div>`;
+    c.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">${ICONS.heart}</div>
+        <h4>${t(UI.empty_favs_title)}</h4>
+        <p>${t(UI.empty_favs_sub)}</p>
+      </div>`;
     return;
   }
   c.innerHTML = "";
@@ -464,7 +543,7 @@ function renderFavorites() {
     div.innerHTML = `
       <div class="option-header">
         <div class="option-title">${mealCategoryOf(m.id)} — ${t(UI.option_label)} ${t(m.num)}${title}</div>
-        <button class="fav-btn active" data-fav="${m.id}">❤️</button>
+        <button class="fav-btn active" data-fav="${m.id}" aria-label="Remove favorite">${ICONS.heartFilled}</button>
       </div>
       <div class="option-body">
         <ul>${m.items.map(x => `<li>${t(x)}</li>`).join("")}</ul>
@@ -519,10 +598,19 @@ function compressImage(file, maxWidth) {
 function renderPhotos() {
   const grid = document.getElementById("photoGrid");
   grid.innerHTML = "";
+  if (state.photos.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-state-icon">${ICONS.camera}</div>
+        <h4>${t(UI.empty_photos_title)}</h4>
+        <p>${t(UI.empty_photos_sub)}</p>
+      </div>`;
+    return;
+  }
   [...state.photos].reverse().forEach(p => {
     const div = document.createElement("div");
     div.className = "photo-item";
-    div.innerHTML = `<img src="${p.data}" alt="" /><div class="date">${p.date}</div><button class="del" data-id="${p.id}">✕</button>`;
+    div.innerHTML = `<img src="${p.data}" alt="Progress photo from ${p.date}" /><div class="date">${p.date}</div><button class="del" data-id="${p.id}" aria-label="Delete photo">${ICONS.x}</button>`;
     grid.appendChild(div);
   });
   grid.querySelectorAll(".del").forEach(b => {
@@ -600,6 +688,102 @@ document.getElementById("langToggle").addEventListener("click", () => {
   applyLanguage();
 });
 
+// ---------- Weekly insights ----------
+function renderInsights() {
+  const card = document.getElementById("insightsCard");
+  const grid = document.getElementById("insightsGrid");
+  if (!card || !grid) return;
+  if (!state.startDate) { card.hidden = true; return; }
+
+  // Last 7 days (inclusive of today)
+  const now = new Date(today());
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  let daysComplete = 0;
+  let waterTotal = 0;
+  let hasAnyData = false;
+  days.forEach(iso => {
+    const dd = state.days[iso];
+    if (!dd) return;
+    hasAnyData = true;
+    const m = Object.values(dd.meals).filter(Boolean).length;
+    if (m >= 4 && dd.water >= 6) daysComplete++;
+    waterTotal += dd.water;
+  });
+  if (!hasAnyData) { card.hidden = true; return; }
+  card.hidden = false;
+
+  // Weight delta across the 7-day window
+  let weightDelta = "—";
+  if (state.weights.length >= 2) {
+    const weekAgo = days[0];
+    const earlier = state.weights.filter(w => w.date <= weekAgo).pop()
+                 || state.weights[0];
+    const latest = state.weights[state.weights.length - 1];
+    if (latest && earlier && latest.date !== earlier.date) {
+      const diff = latest.kg - earlier.kg;
+      weightDelta = (diff >= 0 ? "+" : "") + diff.toFixed(1) + " " + t(UI.kg);
+    }
+  }
+
+  grid.innerHTML = `
+    <div class="insights-item"><span class="insights-val">${daysComplete}/7</span><span class="insights-lbl">${t(UI.insights_days)}</span></div>
+    <div class="insights-item"><span class="insights-val">${waterTotal}</span><span class="insights-lbl">${t(UI.insights_water)}</span></div>
+    <div class="insights-item"><span class="insights-val">${weightDelta}</span><span class="insights-lbl">${t(UI.insights_weight_change)}</span></div>
+  `;
+}
+
+// ---------- PWA install prompt ----------
+let deferredInstallPrompt = null;
+function setupInstallBanner() {
+  const banner = document.getElementById("installBanner");
+  if (!banner) return;
+  const dismissed = localStorage.getItem("lynn-keto-install-dismissed");
+  const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (dismissed || isStandalone) return;
+
+  const iconEl = document.getElementById("installBannerIcon");
+  const sub = document.getElementById("installBannerSub");
+  const confirm = document.getElementById("installConfirm");
+  const dismiss = document.getElementById("installDismiss");
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  const show = (withPromptBtn) => {
+    if (iconEl) iconEl.innerHTML = isIOS ? ICONS.share : ICONS.download;
+    if (sub && isIOS) sub.textContent = t(UI.install_ios_hint);
+    if (!withPromptBtn && confirm) confirm.style.display = "none";
+    banner.classList.add("show");
+  };
+
+  dismiss.addEventListener("click", () => {
+    localStorage.setItem("lynn-keto-install-dismissed", "1");
+    banner.classList.remove("show");
+  });
+
+  confirm.addEventListener("click", async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === "accepted") {
+        banner.classList.remove("show");
+      }
+      deferredInstallPrompt = null;
+    }
+  });
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    show(true);
+  });
+
+  if (isIOS) show(false);
+}
+
 // ---------- Render all ----------
 function renderAll() {
   renderToday();
@@ -612,10 +796,12 @@ function renderAll() {
   renderPhotos();
   renderPersonInfo();
   renderStartDateDisplay();
+  renderInsights();
 }
 
 // ---------- INIT ----------
 applyLanguage();
+setupInstallBanner();
 
 // ---------- Service Worker ----------
 if ("serviceWorker" in navigator) {

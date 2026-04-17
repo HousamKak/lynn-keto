@@ -35,20 +35,21 @@
     <div class="gate-icon" id="gateIcon"></div>
     <h2 class="gate-title">Lynn's Keto</h2>
     <p class="gate-sub">Enter password to continue</p>
-    <input type="password" id="gateInput" placeholder="••••••" autocomplete="off" />
-    <button class="btn btn-primary" id="gateSubmit">Unlock</button>
-    <p class="gate-error" id="gateError"></p>
+    <label for="gateInput" class="sr-only">Password</label>
+    <input type="password" id="gateInput" placeholder="••••••" autocomplete="off" aria-label="Password" />
+    <button class="btn btn-primary" id="gateSubmit" aria-label="Unlock app">Unlock</button>
+    <p class="gate-error" id="gateError" role="alert" aria-live="assertive"></p>
   </div>
 </div>
 
 <header>
-  <button class="lang-toggle" id="langToggle">EN</button>
+  <button class="lang-toggle" id="langToggle" aria-label="Switch language">EN</button>
   <h1 data-i18n="appTitle">🥗 نظام الكيتو — Lynn</h1>
   <div class="sub" data-i18n="appSub">VIRTUAL DIET · Be wise, Choose right</div>
   <div class="day-badge" id="dayBadge">—</div>
 </header>
 
-<nav class="tabs" id="tabs">
+<nav class="tabs" id="tabs" role="tablist" aria-label="App sections">
   <button class="tab active" data-tab="today" data-i18n="tab_today">🏠 اليوم</button>
   <button class="tab" data-tab="weight" data-i18n="tab_weight">⚖️ الوزن</button>
   <button class="tab" data-tab="calendar" data-i18n="tab_calendar">📅 التقويم</button>
@@ -65,8 +66,25 @@
 
 <main>
 
+<!-- Install banner (rendered dynamically by app.js) -->
+<div class="install-banner" id="installBanner" role="region" aria-label="Install app">
+  <div class="install-banner-icon" id="installBannerIcon"></div>
+  <div class="install-banner-body">
+    <div class="install-banner-title" data-i18n="install_title">أضيفي التطبيق إلى الشاشة الرئيسية</div>
+    <div class="install-banner-sub" id="installBannerSub" data-i18n="install_sub">استخدمي التطبيق كأنه تطبيق حقيقي.</div>
+  </div>
+  <div class="install-banner-actions">
+    <button class="btn-ghost" id="installDismiss" data-i18n="dismiss" aria-label="Dismiss">لاحقاً</button>
+    <button class="btn-ghost primary" id="installConfirm" data-i18n="install_cta" aria-label="Install">تثبيت</button>
+  </div>
+</div>
+
 <!-- TODAY -->
 <section id="today" class="active">
+  <div class="insights-card" id="insightsCard" hidden>
+    <h3 data-i18n="insights_header" style="margin:0">📊 هذا الأسبوع</h3>
+    <div class="insights-grid" id="insightsGrid"></div>
+  </div>
   <div class="card">
     <h2 data-i18n="todayHeader">🏠 يومك اليوم</h2>
     <div id="todayDate" class="text-muted text-center mb-md"></div>
@@ -285,6 +303,10 @@
     </div>
   </div>
 </div>
+
+<!-- Toast + confetti mount points -->
+<div id="toastHost" role="region" aria-live="polite" aria-label="Notifications"></div>
+<div id="confettiHost" aria-hidden="true"></div>
 
 <script src="data.js"></script>
 <script src="icons.js"></script>
