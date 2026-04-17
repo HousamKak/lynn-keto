@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<meta name="theme-color" content="#d62828" />
+<title>نظام الكيتو - Lynn Hamad</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+</head>
+<body>
+
+<header>
+  <h1>🥗 نظام الكيتو — Lynn</h1>
+  <div class="sub">VIRTUAL DIET · Be wise, Choose right</div>
+  <div class="day-badge" id="dayBadge">اليوم — من ٢٨</div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="today">🏠 اليوم</button>
+  <button class="tab" data-tab="weight">⚖️ الوزن</button>
+  <button class="tab" data-tab="calendar">📅 التقويم</button>
+  <button class="tab" data-tab="breakfast">🍳 الفطور</button>
+  <button class="tab" data-tab="lunch">🍽️ الغداء</button>
+  <button class="tab" data-tab="dinner">🌙 العشاء</button>
+  <button class="tab" data-tab="snacks">🥜 السناكات</button>
+  <button class="tab" data-tab="shopping">🛒 المشتريات</button>
+  <button class="tab" data-tab="allowed">✅ المسموحات</button>
+  <button class="tab" data-tab="photos">📸 الصور</button>
+  <button class="tab" data-tab="favorites">❤️ المفضلة</button>
+  <button class="tab" data-tab="settings">⚙️ الإعدادات</button>
+</nav>
+
+<main>
+
+<!-- ============== TODAY ============== -->
+<section id="today" class="active">
+  <div class="card">
+    <h2>🏠 يومك اليوم</h2>
+    <div id="todayDate" class="text-muted text-center mb-md"></div>
+
+    <div class="today-grid">
+      <div class="today-stat">
+        <span class="val" id="statDay">—</span>
+        <span class="lbl">اليوم من ٢٨</span>
+      </div>
+      <div class="today-stat">
+        <span class="val" id="statStreak">0 🔥</span>
+        <span class="lbl">أيام متتالية</span>
+      </div>
+      <div class="today-stat">
+        <span class="val" id="statWater">0/8</span>
+        <span class="lbl">كاسات ماء</span>
+      </div>
+      <div class="today-stat">
+        <span class="val" id="statMeals">0/5</span>
+        <span class="lbl">وجبات اليوم</span>
+      </div>
+    </div>
+
+    <div class="progress-bar"><div class="fill" id="dayProgress" style="width:0%"></div></div>
+  </div>
+
+  <div class="card">
+    <h3>💧 شرب الماء</h3>
+    <p class="text-muted" style="font-size:13px;margin:4px 0">اضغطي على الكاس لتملي — الهدف ٨ كاسات يومياً</p>
+    <div class="water-tracker" id="waterTracker"></div>
+  </div>
+
+  <div class="card">
+    <h3>🍽️ وجبات اليوم</h3>
+    <div id="todayMeals"></div>
+  </div>
+
+  <div class="card">
+    <h3>⏰ التوقيتات المقترحة</h3>
+    <div class="note">لا يوجد مواقيت محددة — وزّعي الوجبات حسب رغبتك خلال النهار.</div>
+    <div class="time-block"><span class="time">٧-٩ ص</span><span>💧 ماء + 🍳 الفطور</span></div>
+    <div class="time-block"><span class="time">١١ ص</span><span>🥜 السناك الأول</span></div>
+    <div class="time-block"><span class="time">١-٢ م</span><span>🍽️ الغداء</span></div>
+    <div class="time-block"><span class="time">٤:٣٠ م</span><span>🥤 السناك الثاني</span></div>
+    <div class="time-block"><span class="time">٧:٣٠ م</span><span>🌙 العشاء</span></div>
+  </div>
+</section>
+
+<!-- ============== WEIGHT ============== -->
+<section id="weight">
+  <div class="card">
+    <h2>⚖️ متابعة الوزن</h2>
+    <div class="today-grid">
+      <div class="today-stat">
+        <span class="val" id="currentWeight">—</span>
+        <span class="lbl">الوزن الحالي</span>
+      </div>
+      <div class="today-stat">
+        <span class="val" id="weightLost">—</span>
+        <span class="lbl">الفاقد (كغ)</span>
+      </div>
+      <div class="today-stat">
+        <span class="val">٥٥.٤١</span>
+        <span class="lbl">الهدف (IBW)</span>
+      </div>
+      <div class="today-stat">
+        <span class="val" id="toGoal">—</span>
+        <span class="lbl">باقي للهدف</span>
+      </div>
+    </div>
+
+    <div class="weight-form">
+      <input type="date" id="weightDate" />
+      <input type="number" id="weightInput" placeholder="الوزن (كغ)" step="0.1" />
+      <button class="btn btn-primary" id="addWeight">إضافة</button>
+    </div>
+    <canvas id="weightChart" height="220"></canvas>
+    <div class="weight-entries" id="weightEntries"></div>
+  </div>
+</section>
+
+<!-- ============== CALENDAR ============== -->
+<section id="calendar">
+  <div class="card">
+    <h2>📅 تقويم ٢٨ يوم</h2>
+    <div class="note info">كل مربع يعرض عدد الوجبات + الماء التي أتممتيها ذلك اليوم. اضغطي على أي يوم لعرض التفاصيل.</div>
+    <div id="calendarGrid" class="calendar-grid"></div>
+    <p class="text-muted" style="font-size:12px;margin-top:10px">اللون الأخضر = يوم مكتمل ٦/٦ &middot; الأصفر = يوم جزئي &middot; الرمادي = لم يُسجّل</p>
+  </div>
+</section>
+
+<!-- ============== BREAKFAST ============== -->
+<section id="breakfast">
+  <div class="card">
+    <h2>🍳 خيارات الفطور</h2>
+    <p class="text-muted">اختاري خياراً واحداً + جدول الخضار. جميع الأجبان مسموحة.</p>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="btn btn-primary" data-random="breakfast">🎲 اختاري لي</button>
+    </div>
+    <div id="breakfastList"></div>
+  </div>
+</section>
+
+<!-- ============== LUNCH ============== -->
+<section id="lunch">
+  <div class="card">
+    <h2>🍽️ خيارات الغداء</h2>
+    <div class="note">شرائح الجبنة: موزاريلا أو تشيدر كاملة الدسم. المايونيز كامل الدسم. الدجاج: صدر/فخذ/جناح.</div>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="btn btn-primary" data-random="lunch">🎲 اختاري لي</button>
+    </div>
+    <div id="lunchList"></div>
+  </div>
+</section>
+
+<!-- ============== DINNER ============== -->
+<section id="dinner">
+  <div class="card">
+    <h2>🌙 خيارات العشاء</h2>
+    <p class="text-muted">مطابقة لخيارات الفطور. جميع الأجبان مسموحة.</p>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="btn btn-primary" data-random="dinner">🎲 اختاري لي</button>
+    </div>
+    <div id="dinnerList"></div>
+  </div>
+</section>
+
+<!-- ============== SNACKS ============== -->
+<section id="snacks">
+  <div class="card">
+    <h2>🥤 السناك الأول</h2>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="btn btn-primary" data-random="snack1">🎲 اختاري لي</button>
+    </div>
+    <div id="snack1List"></div>
+  </div>
+  <div class="card">
+    <h2>🥜 السناك الثاني</h2>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="btn btn-primary" data-random="snack2">🎲 اختاري لي</button>
+    </div>
+    <div id="snack2List"></div>
+  </div>
+</section>
+
+<!-- ============== SHOPPING ============== -->
+<section id="shopping">
+  <div class="card">
+    <h2>🛒 قائمة المشتريات</h2>
+    <p class="text-muted">ضعي علامة على كل شيء اشتريتيه — تُحفظ تلقائياً.</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" id="shopResetBtn">مسح الكل</button>
+      <button class="btn btn-secondary btn-sm" id="shopCheckAllBtn">تحديد الكل</button>
+    </div>
+    <div id="shoppingList"></div>
+  </div>
+</section>
+
+<!-- ============== ALLOWED ============== -->
+<section id="allowed">
+  <div class="card">
+    <h2>✅ المسموحات</h2>
+
+    <h3>الخضار المسموحة</h3>
+    <ul class="pill-list" id="vegPills"></ul>
+
+    <h3>الصوصات المسموحة</h3>
+    <table><thead><tr><th>الصوص</th><th>الكمية</th></tr></thead><tbody id="saucesTable"></tbody></table>
+
+    <h3>المشروبات المسموحة</h3>
+    <ul class="pill-list blue" id="drinksPills"></ul>
+
+    <h3>السكر الاصطناعي</h3>
+    <p>يمكن استعماله يومياً بكمية: <strong>حبتان</strong> أو <strong>ظرفان</strong> أو <strong>ملعقتي شاي</strong>.</p>
+
+    <h3>🔄 جدول استبدال الدهون</h3>
+    <div class="note">يجب تناول كل حصص الدهون. يمكن استبدال أي خيار بآخر من الجدول.</div>
+    <table><thead><tr><th>الخيار</th><th>الكمية المعادلة</th></tr></thead><tbody id="fatTable"></tbody></table>
+  </div>
+</section>
+
+<!-- ============== PHOTOS ============== -->
+<section id="photos">
+  <div class="card">
+    <h2>📸 يوميات الصور</h2>
+    <p class="text-muted">احفظي صور "قبل / أثناء / بعد" — كل الصور محفوظة محلياً على جهازك فقط.</p>
+    <label class="photo-upload">
+      📷 إضافة صورة
+      <input type="file" id="photoInput" accept="image/*" />
+    </label>
+    <div class="photo-grid" id="photoGrid"></div>
+  </div>
+</section>
+
+<!-- ============== FAVORITES ============== -->
+<section id="favorites">
+  <div class="card">
+    <h2>❤️ الوجبات المفضلة</h2>
+    <p class="text-muted">الخيارات التي أضفتيها بالقلب من صفحات الوجبات.</p>
+    <div id="favoritesList"></div>
+  </div>
+</section>
+
+<!-- ============== SETTINGS ============== -->
+<section id="settings">
+  <div class="card">
+    <h2>⚙️ الإعدادات</h2>
+
+    <h3>تاريخ بدء النظام</h3>
+    <div class="weight-form">
+      <input type="date" id="startDateInput" />
+      <button class="btn btn-primary" id="saveStartDate">حفظ</button>
+    </div>
+
+    <h3>المعلومات الشخصية</h3>
+    <div class="info-grid" id="personInfo"></div>
+
+    <h3>تصدير / استيراد</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="exportData">📤 تصدير البيانات</button>
+      <label class="btn btn-secondary" style="cursor:pointer">
+        📥 استيراد
+        <input type="file" id="importData" accept=".json" style="display:none" />
+      </label>
+      <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة</button>
+    </div>
+
+    <h3 style="color:var(--accent)">منطقة الخطر</h3>
+    <button class="btn" style="background:#ef4444;color:white" id="resetAll">🗑️ مسح جميع البيانات</button>
+  </div>
+</section>
+
+</main>
+
+<!-- Modal for random picker -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3 id="modalTitle">اختيار عشوائي</h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modalClose">إغلاق</button>
+      <button class="btn btn-primary" id="modalPickAgain">🎲 اختيار آخر</button>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
