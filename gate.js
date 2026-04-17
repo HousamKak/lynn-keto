@@ -1,27 +1,48 @@
 // ============================================================
-// Password gate — client-side only (friction barrier, not real security)
+// Password gate — daily (resets at midnight), logs each login
 // Password: daisy
 // ============================================================
 (function () {
-  const PASS_KEY = "lynn-keto-unlocked";
+  const UNLOCK_DATE_KEY = "lynn-keto-unlock-date";
+  const LOGIN_LOG_KEY = "lynn-keto-login-log";
   const PASSWORD = "daisy";
 
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+
+  function logLogin() {
+    try {
+      const raw = localStorage.getItem(LOGIN_LOG_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      log.push(new Date().toISOString());
+      // Keep only last 200 entries to bound storage growth
+      if (log.length > 200) log.splice(0, log.length - 200);
+      localStorage.setItem(LOGIN_LOG_KEY, JSON.stringify(log));
+    } catch (e) {}
+  }
+
   function unlock(persist) {
-    if (persist) localStorage.setItem(PASS_KEY, "1");
+    if (persist) {
+      localStorage.setItem(UNLOCK_DATE_KEY, todayStr());
+      logLogin();
+    }
     document.body.classList.remove("locked");
   }
 
-  // Already unlocked on this device → skip gate
-  if (localStorage.getItem(PASS_KEY) === "1") {
+  // Already unlocked today on this device → skip gate
+  if (localStorage.getItem(UNLOCK_DATE_KEY) === todayStr()) {
     unlock(false);
     return;
   }
 
-  // Wait for DOM (should already be ready since script is at end of body)
+  // Different day (or never) — force re-login
+  localStorage.removeItem(UNLOCK_DATE_KEY);
+
   const input = document.getElementById("gateInput");
   const btn = document.getElementById("gateSubmit");
   const err = document.getElementById("gateError");
-
   if (!input || !btn) return;
 
   setTimeout(() => { try { input.focus(); } catch(e){} }, 80);
