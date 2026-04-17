@@ -1,8 +1,28 @@
 // ============================================================
-// LYNN KETO — App logic
+// LYNN KETO — App logic (bilingual ar/en)
 // ============================================================
 
 const LS_KEY = "lynn-keto-v1";
+const LANG_KEY = "lynn-keto-lang";
+
+let lang = localStorage.getItem(LANG_KEY) || "ar";
+
+// ---------- i18n helpers ----------
+function t(x) {
+  if (x == null) return "";
+  if (typeof x === "string") return x;
+  return x[lang] ?? x.ar ?? x.en ?? "";
+}
+function tUI(key, vars) {
+  let s = t(UI[key]);
+  if (vars) Object.entries(vars).forEach(([k,v]) => { s = s.replace("{"+k+"}", v); });
+  return s;
+}
+function localizedNumber(n) {
+  if (lang === "en") return String(n);
+  const map = "٠١٢٣٤٥٦٧٨٩";
+  return String(n).replace(/\d/g, d => map[+d]);
+}
 
 // ---------- Storage ----------
 function loadState() {
@@ -10,42 +30,33 @@ function loadState() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return defaultState();
     return { ...defaultState(), ...JSON.parse(raw) };
-  } catch (e) {
-    console.error("loadState", e);
-    return defaultState();
-  }
+  } catch (e) { return defaultState(); }
 }
-function saveState() {
-  localStorage.setItem(LS_KEY, JSON.stringify(state));
-}
+function saveState() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 function defaultState() {
   return {
-    startDate: null,        // "YYYY-MM-DD"
-    days: {},               // { "YYYY-MM-DD": { water: 0, meals: { breakfast:bool, lunch:bool, dinner:bool, snack1:bool, snack2:bool } } }
-    weights: [],            // [{ date, kg }]
-    favorites: [],          // [mealId, ...]
-    shopping: {},           // { itemKey: bool }
-    photos: []              // [{ id, date, data (base64) }]
+    startDate: null,
+    days: {},
+    weights: [],
+    favorites: [],
+    shopping: {},
+    photos: []
   };
 }
-
 let state = loadState();
 
 // ---------- Date helpers ----------
 function today() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 function daysBetween(a, b) {
-  const da = new Date(a); const db = new Date(b);
-  return Math.round((db - da) / 86400000);
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
-function formatArDate(iso) {
+function formatDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString("ar-EG", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  return d.toLocaleDateString(lang === "en" ? "en-US" : "ar-EG",
+    { weekday:"long", year:"numeric", month:"long", day:"numeric" });
 }
 function dayNumber() {
   if (!state.startDate) return null;
@@ -56,6 +67,28 @@ function ensureDay(iso) {
     state.days[iso] = { water: 0, meals: { breakfast:false, lunch:false, dinner:false, snack1:false, snack2:false } };
   }
   return state.days[iso];
+}
+
+// ---------- Language switch ----------
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "en" ? "ltr" : "rtl";
+  document.title = lang === "en" ? "Keto Plan — Lynn Hamad" : "نظام الكيتو - Lynn Hamad";
+  document.getElementById("langToggle").textContent = t(UI.btn_lang);
+  // Apply static UI strings via data-i18n
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.dataset.i18n;
+    if (UI[key]) el.textContent = t(UI[key]);
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => {
+    const key = el.dataset.i18nHtml;
+    if (UI[key]) el.innerHTML = t(UI[key]);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    const key = el.dataset.i18nPlaceholder;
+    if (UI[key]) el.placeholder = t(UI[key]);
+  });
+  renderAll();
 }
 
 // ---------- Tabs ----------
@@ -72,23 +105,24 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
-// ---------- TODAY tab ----------
+// ---------- TODAY ----------
 function renderToday() {
   const iso = today();
   const dayData = ensureDay(iso);
 
-  document.getElementById("todayDate").textContent = formatArDate(iso);
+  document.getElementById("todayDate").textContent = formatDate(iso);
   const n = dayNumber();
-  document.getElementById("statDay").textContent = n ? `${n}` : "—";
-  document.getElementById("dayBadge").textContent = n ? `اليوم ${n} من ${PERSON.durationDays}` : "لم يبدأ بعد";
-  document.getElementById("statWater").textContent = `${dayData.water}/8`;
+  document.getElementById("statDay").textContent = n ? localizedNumber(n) : "—";
+  document.getElementById("dayBadge").textContent = n
+    ? tUI("dayBadge", { n: localizedNumber(n), total: localizedNumber(PERSON.durationDays) })
+    : t(UI.notStarted);
+  document.getElementById("statWater").textContent = `${localizedNumber(dayData.water)}/8`;
   const mealCount = Object.values(dayData.meals).filter(Boolean).length;
-  document.getElementById("statMeals").textContent = `${mealCount}/5`;
-  document.getElementById("statStreak").textContent = `${currentStreak()} 🔥`;
+  document.getElementById("statMeals").textContent = `${localizedNumber(mealCount)}/5`;
+  document.getElementById("statStreak").textContent = `${localizedNumber(currentStreak())} 🔥`;
 
   const dayScore = mealCount + (dayData.water >= 8 ? 1 : 0);
-  const pct = (dayScore / 6) * 100;
-  document.getElementById("dayProgress").style.width = pct + "%";
+  document.getElementById("dayProgress").style.width = ((dayScore/6)*100) + "%";
 
   // Water cups
   const wt = document.getElementById("waterTracker");
@@ -104,29 +138,29 @@ function renderToday() {
     wt.appendChild(cup);
   }
 
-  // Meal checklist
+  // Meals
   const mealOrder = [
-    ["breakfast","🍳","الفطور"],
-    ["snack1","🥤","سناك ١"],
-    ["lunch","🍽️","الغداء"],
-    ["snack2","🥜","سناك ٢"],
-    ["dinner","🌙","العشاء"]
+    ["breakfast","🍳","meal_breakfast"],
+    ["snack1","🥤","meal_snack1"],
+    ["lunch","🍽️","meal_lunch"],
+    ["snack2","🥜","meal_snack2"],
+    ["dinner","🌙","meal_dinner"]
   ];
   const mealsDiv = document.getElementById("todayMeals");
   mealsDiv.innerHTML = "";
-  mealOrder.forEach(([key, icon, label]) => {
+  mealOrder.forEach(([key, icon, uiKey]) => {
     const done = dayData.meals[key];
     const row = document.createElement("div");
     row.className = "meal-check" + (done ? " done" : "");
     row.innerHTML = `
       <span class="meal-icon">${icon}</span>
       <div class="meal-body">
-        <div class="meal-title">${label}</div>
-        <div class="meal-sub">${done ? "✅ تم" : "لم يتم بعد"}</div>
+        <div class="meal-title">${t(UI[uiKey])}</div>
+        <div class="meal-sub">${done ? t(UI.meal_done) : t(UI.meal_not_done)}</div>
       </div>
       <div class="meal-actions">
         <button class="btn-sm" data-random="${key}">🎲</button>
-        <button class="btn-sm ${done ? "" : "success"}" data-toggle="${key}">${done ? "إلغاء" : "✓ تم"}</button>
+        <button class="btn-sm ${done ? "" : "success"}" data-toggle="${key}">${done ? t(UI.btn_undo) : t(UI.btn_done)}</button>
       </div>
     `;
     mealsDiv.appendChild(row);
@@ -142,7 +176,6 @@ function renderToday() {
     b.addEventListener("click", () => openRandom(b.dataset.random));
   });
 }
-
 function currentStreak() {
   if (!state.startDate) return 0;
   let streak = 0;
@@ -167,15 +200,15 @@ function renderMealList(containerId, meals) {
     const fav = state.favorites.includes(m.id);
     const div = document.createElement("div");
     div.className = "option" + (fav ? " fav" : "");
-    const title = m.title ? ` — ${m.title}` : "";
+    const title = m.title ? ` — ${t(m.title)}` : "";
     div.innerHTML = `
       <div class="option-header">
-        <div class="option-title">الخيار ${m.num}${title}</div>
-        <button class="fav-btn ${fav ? "active" : ""}" data-fav="${m.id}" title="مفضلة">${fav ? "❤️" : "🤍"}</button>
+        <div class="option-title">${t(UI.option_label)} ${t(m.num)}${title}</div>
+        <button class="fav-btn ${fav ? "active" : ""}" data-fav="${m.id}">${fav ? "❤️" : "🤍"}</button>
       </div>
       <div class="option-body">
-        <ul>${m.items.map(x => `<li>${x}</li>`).join("")}</ul>
-        ${m.note ? `<div class="note">${m.note}</div>` : ""}
+        <ul>${m.items.map(x => `<li>${t(x)}</li>`).join("")}</ul>
+        ${m.note ? `<div class="note">${t(m.note)}</div>` : ""}
       </div>
     `;
     c.appendChild(div);
@@ -201,33 +234,28 @@ function renderAllMealLists() {
 }
 
 // ---------- Random picker ----------
-const MEAL_POOL = {
-  breakfast: BREAKFAST, lunch: LUNCH, dinner: DINNER,
-  snack1: SNACK1, snack2: SNACK2
-};
-const MEAL_LABEL = {
-  breakfast: "🍳 فطور", lunch: "🍽️ غداء", dinner: "🌙 عشاء",
-  snack1: "🥤 سناك ١", snack2: "🥜 سناك ٢"
-};
+const MEAL_POOL = { breakfast: BREAKFAST, lunch: LUNCH, dinner: DINNER, snack1: SNACK1, snack2: SNACK2 };
+const MEAL_LABEL_KEY = { breakfast:"meal_breakfast", lunch:"meal_lunch", dinner:"meal_dinner", snack1:"meal_snack1", snack2:"meal_snack2" };
+const MEAL_ICON = { breakfast:"🍳", lunch:"🍽️", dinner:"🌙", snack1:"🥤", snack2:"🥜" };
 let currentRandomCategory = null;
 
 function openRandom(cat) {
   currentRandomCategory = cat;
+  document.getElementById("modalPickAgain").style.display = "";
   pickRandom();
   document.getElementById("modal").classList.add("show");
 }
 function pickRandom() {
   const pool = MEAL_POOL[currentRandomCategory];
   const pick = pool[Math.floor(Math.random() * pool.length)];
-  document.getElementById("modalTitle").textContent = `${MEAL_LABEL[currentRandomCategory]} — ${pick.title ? pick.title : "الخيار " + pick.num}`;
+  const label = `${MEAL_ICON[currentRandomCategory]} ${t(UI[MEAL_LABEL_KEY[currentRandomCategory]])}`;
+  const titleStr = pick.title ? t(pick.title) : `${t(UI.option_label)} ${t(pick.num)}`;
+  document.getElementById("modalTitle").textContent = `${label} — ${titleStr}`;
   document.getElementById("modalBody").innerHTML = `
-    <ul style="padding-right:18px">${pick.items.map(x => `<li style="margin-bottom:4px">${x}</li>`).join("")}</ul>
-    ${pick.note ? `<div class="note">${pick.note}</div>` : ""}
+    <ul style="padding-inline-start:18px">${pick.items.map(x => `<li style="margin-bottom:4px">${t(x)}</li>`).join("")}</ul>
+    ${pick.note ? `<div class="note">${t(pick.note)}</div>` : ""}
   `;
 }
-document.querySelectorAll("[data-random]").forEach(b => {
-  b.addEventListener("click", () => openRandom(b.dataset.random));
-});
 document.getElementById("modalClose").addEventListener("click", () => {
   document.getElementById("modal").classList.remove("show");
 });
@@ -240,21 +268,21 @@ document.getElementById("modal").addEventListener("click", (e) => {
 function renderShopping() {
   const c = document.getElementById("shoppingList");
   c.innerHTML = "";
-  Object.entries(SHOPPING).forEach(([category, items]) => {
+  SHOPPING.forEach(category => {
     const div = document.createElement("div");
     div.className = "shop-category";
-    div.innerHTML = `<h4>${category}</h4>`;
-    items.forEach(item => {
-      const key = category + "|" + item;
+    div.innerHTML = `<h4>${t(category.title)}</h4>`;
+    category.items.forEach(item => {
+      const key = item.ar; // stable across languages
       const checked = !!state.shopping[key];
       const wrap = document.createElement("div");
       wrap.className = "checkbox-wrap";
       const id = "shop-" + btoa(unescape(encodeURIComponent(key))).replace(/=/g,"");
       wrap.innerHTML = `
         <input type="checkbox" id="${id}" ${checked ? "checked" : ""} />
-        <label for="${id}">${item}</label>
+        <label for="${id}">${t(item)}</label>
       `;
-      wrap.querySelector("input").addEventListener("change", (e) => {
+      wrap.querySelector("input").addEventListener("change", e => {
         state.shopping[key] = e.target.checked;
         saveState();
       });
@@ -264,26 +292,23 @@ function renderShopping() {
   });
 }
 document.getElementById("shopResetBtn").addEventListener("click", () => {
-  if (!confirm("مسح جميع العلامات؟")) return;
-  state.shopping = {};
-  saveState(); renderShopping();
+  if (!confirm(t(UI.shop_reset_confirm))) return;
+  state.shopping = {}; saveState(); renderShopping();
 });
 document.getElementById("shopCheckAllBtn").addEventListener("click", () => {
-  Object.entries(SHOPPING).forEach(([cat, items]) => {
-    items.forEach(it => { state.shopping[cat + "|" + it] = true; });
-  });
+  SHOPPING.forEach(cat => cat.items.forEach(it => { state.shopping[it.ar] = true; }));
   saveState(); renderShopping();
 });
 
 // ---------- ALLOWED ----------
 function renderAllowed() {
-  document.getElementById("vegPills").innerHTML = VEGETABLES.map(v => `<li>${v}</li>`).join("");
-  document.getElementById("drinksPills").innerHTML = DRINKS.map(d => `<li>${d}</li>`).join("");
+  document.getElementById("vegPills").innerHTML = VEGETABLES.map(v => `<li>${t(v)}</li>`).join("");
+  document.getElementById("drinksPills").innerHTML = DRINKS.map(d => `<li>${t(d)}</li>`).join("");
   document.getElementById("saucesTable").innerHTML = SAUCES.map(s =>
-    `<tr><td>${s.name}</td><td>${s.qty}</td></tr>`
+    `<tr><td>${t(s.name)}</td><td>${t(s.qty)}</td></tr>`
   ).join("");
   document.getElementById("fatTable").innerHTML = FAT_EXCHANGE.map(([n,q]) =>
-    `<tr><td>${n}</td><td>${q}</td></tr>`
+    `<tr><td>${t(n)}</td><td>${t(q)}</td></tr>`
   ).join("");
 }
 
@@ -292,7 +317,7 @@ document.getElementById("weightDate").value = today();
 document.getElementById("addWeight").addEventListener("click", () => {
   const date = document.getElementById("weightDate").value;
   const kg = parseFloat(document.getElementById("weightInput").value);
-  if (!date || !kg || isNaN(kg)) { alert("أدخلي تاريخ ووزن صحيح"); return; }
+  if (!date || !kg || isNaN(kg)) { alert(t(UI.date_value_invalid)); return; }
   state.weights = state.weights.filter(w => w.date !== date);
   state.weights.push({ date, kg });
   state.weights.sort((a,b) => a.date.localeCompare(b.date));
@@ -319,8 +344,8 @@ function renderWeight() {
     const row = document.createElement("div");
     row.className = "weight-row";
     row.innerHTML = `
-      <span>${formatArDate(w.date)}</span>
-      <span><strong>${w.kg.toFixed(1)} كغ</strong>
+      <span>${formatDate(w.date)}</span>
+      <span><strong>${w.kg.toFixed(1)} ${t(UI.kg)}</strong>
         <button class="del" data-date="${w.date}">🗑️</button>
       </span>
     `;
@@ -334,47 +359,25 @@ function renderWeight() {
   });
   renderWeightChart();
 }
-
 let chartInstance = null;
 function renderWeightChart() {
   if (!window.Chart) return;
   const ctx = document.getElementById("weightChart");
   if (!ctx) return;
   if (chartInstance) chartInstance.destroy();
-
-  // Generate labels including IBW line
   const labels = state.weights.map(w => w.date.slice(5));
   const data = state.weights.map(w => w.kg);
   const ibwLine = state.weights.map(() => PERSON.ibw);
-
   chartInstance = new Chart(ctx, {
     type: "line",
     data: {
       labels,
       datasets: [
-        {
-          label: "الوزن (كغ)",
-          data,
-          borderColor: "#d62828",
-          backgroundColor: "rgba(214,40,40,.1)",
-          tension: .3,
-          fill: true
-        },
-        {
-          label: "الهدف (IBW)",
-          data: ibwLine,
-          borderColor: "#2d6a4f",
-          borderDash: [6,4],
-          fill: false,
-          pointRadius: 0
-        }
+        { label: t(UI.chart_weight), data, borderColor:"#d62828", backgroundColor:"rgba(214,40,40,.1)", tension:.3, fill:true },
+        { label: t(UI.chart_goal), data: ibwLine, borderColor:"#2d6a4f", borderDash:[6,4], fill:false, pointRadius:0 }
       ]
     },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: false } }
-    }
+    options: { responsive:true, plugins:{ legend:{ position:"bottom" } } }
   });
 }
 
@@ -383,7 +386,7 @@ function renderCalendar() {
   const grid = document.getElementById("calendarGrid");
   grid.innerHTML = "";
   if (!state.startDate) {
-    grid.innerHTML = `<div style="grid-column:1/-1" class="note">حددي تاريخ بدء النظام من الإعدادات أولاً.</div>`;
+    grid.innerHTML = `<div style="grid-column:1/-1" class="note">${t(UI.cal_no_start)}</div>`;
     return;
   }
   const start = new Date(state.startDate);
@@ -394,13 +397,11 @@ function renderCalendar() {
     const iso = d.toISOString().slice(0,10);
     const dd = state.days[iso];
     let score = 0;
-    if (dd) {
-      score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
-    }
+    if (dd) score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
     const cell = document.createElement("div");
     cell.className = "cal-day";
     cell.dataset.score = score;
-    cell.textContent = (i+1);
+    cell.textContent = localizedNumber(i+1);
     if (iso === todayIso) cell.classList.add("today");
     if (iso > todayIso) cell.classList.add("future");
     cell.title = `${iso} — ${score}/6`;
@@ -413,22 +414,17 @@ function renderCalendar() {
 }
 function showDayDetails(iso, dayNum) {
   const dd = state.days[iso] || { water: 0, meals: {} };
-  const mealNames = { breakfast:"الفطور", snack1:"سناك ١", lunch:"الغداء", snack2:"سناك ٢", dinner:"العشاء" };
-  const mealsHtml = Object.entries(mealNames).map(([k, l]) =>
-    `<li>${dd.meals[k] ? "✅" : "⬜"} ${l}</li>`
+  const mealKeys = { breakfast:"meal_breakfast", snack1:"meal_snack1", lunch:"meal_lunch", snack2:"meal_snack2", dinner:"meal_dinner" };
+  const mealsHtml = Object.entries(mealKeys).map(([k, uiKey]) =>
+    `<li>${dd.meals[k] ? "✅" : "⬜"} ${t(UI[uiKey])}</li>`
   ).join("");
-  document.getElementById("modalTitle").textContent = `اليوم ${dayNum} — ${formatArDate(iso)}`;
+  document.getElementById("modalTitle").textContent = `${t(UI.day_label)} ${localizedNumber(dayNum)} — ${formatDate(iso)}`;
   document.getElementById("modalBody").innerHTML = `
-    <p>💧 <strong>${dd.water}/8</strong> كاسات ماء</p>
-    <ul style="padding-right:18px">${mealsHtml}</ul>
+    <p>💧 <strong>${localizedNumber(dd.water)}/8</strong> ${t(UI.water_cups)}</p>
+    <ul style="padding-inline-start:18px">${mealsHtml}</ul>
   `;
   document.getElementById("modalPickAgain").style.display = "none";
   document.getElementById("modal").classList.add("show");
-  setTimeout(() => {
-    const btn = document.getElementById("modalPickAgain");
-    const handler = () => { btn.style.display = ""; btn.removeEventListener("click", handler); };
-    document.getElementById("modalClose").addEventListener("click", handler, { once: true });
-  }, 0);
 }
 
 // ---------- FAVORITES ----------
@@ -437,21 +433,21 @@ function renderFavorites() {
   const favs = all.filter(m => state.favorites.includes(m.id));
   const c = document.getElementById("favoritesList");
   if (favs.length === 0) {
-    c.innerHTML = `<div class="note">لا توجد وجبات مفضلة بعد. اضغطي 🤍 على أي خيار في صفحات الوجبات لإضافته.</div>`;
+    c.innerHTML = `<div class="note">${t(UI.fav_empty)}</div>`;
     return;
   }
   c.innerHTML = "";
   favs.forEach(m => {
     const div = document.createElement("div");
     div.className = "option fav";
-    const title = m.title ? ` — ${m.title}` : "";
+    const title = m.title ? ` — ${t(m.title)}` : "";
     div.innerHTML = `
       <div class="option-header">
-        <div class="option-title">${mealCategoryOf(m.id)} — الخيار ${m.num}${title}</div>
+        <div class="option-title">${mealCategoryOf(m.id)} — ${t(UI.option_label)} ${t(m.num)}${title}</div>
         <button class="fav-btn active" data-fav="${m.id}">❤️</button>
       </div>
       <div class="option-body">
-        <ul>${m.items.map(x => `<li>${x}</li>`).join("")}</ul>
+        <ul>${m.items.map(x => `<li>${t(x)}</li>`).join("")}</ul>
       </div>
     `;
     c.appendChild(div);
@@ -465,27 +461,21 @@ function renderFavorites() {
   });
 }
 function mealCategoryOf(id) {
-  if (id.startsWith("b")) return "🍳 فطور";
-  if (id.startsWith("l")) return "🍽️ غداء";
-  if (id.startsWith("d")) return "🌙 عشاء";
-  if (id.startsWith("s1")) return "🥤 سناك ١";
-  if (id.startsWith("s2")) return "🥜 سناك ٢";
+  if (id.startsWith("b")) return "🍳 " + t(UI.meal_breakfast);
+  if (id.startsWith("l")) return "🍽️ " + t(UI.meal_lunch);
+  if (id.startsWith("d")) return "🌙 " + t(UI.meal_dinner);
+  if (id.startsWith("s1")) return "🥤 " + t(UI.meal_snack1);
+  if (id.startsWith("s2")) return "🥜 " + t(UI.meal_snack2);
   return "";
 }
 
 // ---------- PHOTOS ----------
-document.getElementById("photoInput").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+document.getElementById("photoInput").addEventListener("change", async e => {
+  const file = e.target.files[0]; if (!file) return;
   const compressed = await compressImage(file, 800);
   state.photos.push({ id: Date.now().toString(), date: today(), data: compressed });
-  try {
-    saveState();
-    renderPhotos();
-  } catch (err) {
-    alert("لا توجد مساحة كافية لحفظ الصورة. احذفي بعض الصور القديمة.");
-    state.photos.pop();
-  }
+  try { saveState(); renderPhotos(); }
+  catch (err) { alert(t(UI.photo_full)); state.photos.pop(); }
   e.target.value = "";
 });
 function compressImage(file, maxWidth) {
@@ -512,16 +502,12 @@ function renderPhotos() {
   [...state.photos].reverse().forEach(p => {
     const div = document.createElement("div");
     div.className = "photo-item";
-    div.innerHTML = `
-      <img src="${p.data}" alt="photo" />
-      <div class="date">${p.date}</div>
-      <button class="del" data-id="${p.id}">✕</button>
-    `;
+    div.innerHTML = `<img src="${p.data}" alt="" /><div class="date">${p.date}</div><button class="del" data-id="${p.id}">✕</button>`;
     grid.appendChild(div);
   });
   grid.querySelectorAll(".del").forEach(b => {
     b.addEventListener("click", () => {
-      if (!confirm("حذف هذه الصورة؟")) return;
+      if (!confirm(t(UI.photo_delete_confirm))) return;
       state.photos = state.photos.filter(p => p.id !== b.dataset.id);
       saveState(); renderPhotos();
     });
@@ -532,22 +518,22 @@ function renderPhotos() {
 document.getElementById("startDateInput").value = state.startDate || today();
 document.getElementById("saveStartDate").addEventListener("click", () => {
   const v = document.getElementById("startDateInput").value;
-  if (!v) { alert("اختاري تاريخ"); return; }
+  if (!v) { alert(t(UI.choose_date)); return; }
   state.startDate = v;
   saveState(); renderToday(); renderCalendar();
-  alert("تم حفظ تاريخ البدء ✅");
+  alert(t(UI.start_saved));
 });
 function renderPersonInfo() {
   const c = document.getElementById("personInfo");
   const items = [
-    ["الاسم", PERSON.name],
-    ["الوزن الابتدائي", PERSON.weight + " كغ"],
-    ["الطول", PERSON.height + " سم"],
-    ["العمر", PERSON.age + " سنة"],
-    ["BMI", PERSON.bmi],
-    ["IBW", PERSON.ibw + " كغ"],
-    ["الماء", PERSON.waterCupsPerDay + " كاسات/يوم"],
-    ["المدة", PERSON.durationDays + " يوم"]
+    [t(UI.info_name), PERSON.name],
+    [t(UI.info_weight), PERSON.weight + " " + t(UI.kg)],
+    [t(UI.info_height), PERSON.height + " " + t(UI.cm)],
+    [t(UI.info_age), PERSON.age + " " + t(UI.years)],
+    [t(UI.info_bmi), PERSON.bmi],
+    [t(UI.info_ibw), PERSON.ibw + " " + t(UI.kg)],
+    [t(UI.info_water), PERSON.waterCupsPerDay + " " + t(UI.cups_day)],
+    [t(UI.info_duration), PERSON.durationDays + " " + t(UI.days)]
   ];
   c.innerHTML = items.map(([l,v]) => `<div class="info-item"><span>${l}</span><strong>${v}</strong></div>`).join("");
 }
@@ -555,36 +541,33 @@ document.getElementById("exportData").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `lynn-keto-${today()}.json`;
-  a.click();
+  a.href = url; a.download = `lynn-keto-${today()}.json`; a.click();
   URL.revokeObjectURL(url);
 });
-document.getElementById("importData").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+document.getElementById("importData").addEventListener("change", async e => {
+  const file = e.target.files[0]; if (!file) return;
   try {
-    const txt = await file.text();
-    const data = JSON.parse(txt);
-    if (!confirm("سيتم استبدال جميع البيانات الحالية. متابعة؟")) return;
+    const data = JSON.parse(await file.text());
+    if (!confirm(t(UI.import_confirm))) return;
     state = { ...defaultState(), ...data };
-    saveState();
-    location.reload();
-  } catch (err) {
-    alert("ملف غير صالح");
-  }
+    saveState(); location.reload();
+  } catch { alert(t(UI.invalid_file)); }
 });
 document.getElementById("resetAll").addEventListener("click", () => {
-  if (!confirm("هل أنت متأكدة؟ سيتم حذف كل البيانات ولا يمكن استرجاعها.")) return;
-  if (!confirm("تأكيد أخير — حذف كل شيء؟")) return;
-  localStorage.removeItem(LS_KEY);
-  state = defaultState();
-  saveState();
-  location.reload();
+  if (!confirm(t(UI.reset_confirm1))) return;
+  if (!confirm(t(UI.reset_confirm2))) return;
+  localStorage.removeItem(LS_KEY); state = defaultState(); saveState(); location.reload();
 });
 
-// ---------- INIT ----------
-function initAll() {
+// ---------- Language toggle button ----------
+document.getElementById("langToggle").addEventListener("click", () => {
+  lang = lang === "ar" ? "en" : "ar";
+  localStorage.setItem(LANG_KEY, lang);
+  applyLanguage();
+});
+
+// ---------- Render all ----------
+function renderAll() {
   renderToday();
   renderAllMealLists();
   renderShopping();
@@ -595,7 +578,9 @@ function initAll() {
   renderPhotos();
   renderPersonInfo();
 }
-initAll();
+
+// ---------- INIT ----------
+applyLanguage();
 
 // ---------- Service Worker ----------
 if ("serviceWorker" in navigator) {

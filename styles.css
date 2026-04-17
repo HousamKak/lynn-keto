@@ -474,7 +474,92 @@ table tr:nth-child(even) { background: #fafafa; }
 }
 
 @media print {
-  .tabs, .fab, .modal-backdrop { display: none !important; }
+  .tabs, .fab, .modal-backdrop, .lang-toggle, .gate-overlay { display: none !important; }
   section { display: block !important; page-break-before: always; }
   section:first-of-type { page-break-before: auto; }
+}
+
+/* ---------- Language toggle button ---------- */
+.lang-toggle {
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 16px;
+  background: rgba(255,255,255,.2);
+  color: white;
+  border: 1px solid rgba(255,255,255,.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.lang-toggle:hover { background: rgba(255,255,255,.3); }
+header { position: relative; }
+
+/* RTL-aware spacing: some pieces used explicit padding-right — normalize with logical props */
+.option-body ul { padding-right: 0; padding-inline-start: 20px; }
+.shop-category { border-right: none; border-inline-end: 4px solid var(--green); }
+.note { border-right: none; border-inline-end: 4px solid var(--amber); }
+.note.success { border-inline-end-color: var(--green); }
+.note.info { border-inline-end-color: var(--blue); }
+[dir="ltr"] .water-tracker { direction: ltr; }
+
+/* ---------- Password gate ---------- */
+.gate-overlay {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #d62828 0%, #8a1c1c 100%);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  transition: opacity .3s;
+}
+.gate-overlay.show { display: flex; }
+.gate-overlay.hide { opacity: 0; pointer-events: none; }
+.gate-card {
+  background: white;
+  border-radius: 16px;
+  padding: 32px 28px;
+  max-width: 360px; width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.gate-icon { font-size: 48px; margin-bottom: 12px; }
+.gate-title {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 24px;
+}
+.gate-sub {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.gate-card input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-size: 18px;
+  font-family: inherit;
+  text-align: center;
+  letter-spacing: 3px;
+  margin-bottom: 12px;
+}
+.gate-card input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.gate-card .btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+}
+.gate-error {
+  color: var(--accent);
+  font-size: 13px;
+  margin: 8px 0 0;
+  min-height: 18px;
 }

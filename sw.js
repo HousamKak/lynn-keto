@@ -1,5 +1,5 @@
-const CACHE = "lynn-keto-v1";
-const ASSETS = ["./", "index.html", "styles.css", "data.js", "app.js", "manifest.json", "icon.svg"];
+const CACHE = "lynn-keto-v2";
+const ASSETS = ["./", "index.html", "styles.css", "data.js", "app.js", "gate.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
