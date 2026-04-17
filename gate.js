@@ -5,7 +5,31 @@
 (function () {
   const UNLOCK_DATE_KEY = "lynn-keto-unlock-date";
   const LOGIN_LOG_KEY = "lynn-keto-login-log";
+  const LEGACY_UNLOCK_KEY = "lynn-keto-unlocked";
   const PASSWORD = "daisy";
+
+  // Clean up legacy key from previous version
+  if (localStorage.getItem(LEGACY_UNLOCK_KEY)) {
+    localStorage.removeItem(LEGACY_UNLOCK_KEY);
+  }
+
+  // Reset-everything escape hatch: visit ?clear=1
+  if (new URLSearchParams(location.search).get("clear") === "1") {
+    localStorage.removeItem(UNLOCK_DATE_KEY);
+    localStorage.removeItem(LOGIN_LOG_KEY);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        Promise.all(regs.map(r => r.unregister())).then(() => {
+          if (window.caches) caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => {
+            location.replace(location.pathname);
+          });
+        });
+      });
+    } else {
+      location.replace(location.pathname);
+    }
+    return;
+  }
 
   function todayStr() {
     const d = new Date();
