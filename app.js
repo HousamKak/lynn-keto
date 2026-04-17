@@ -75,6 +75,19 @@ function ensureDay(iso) {
   return state.days[iso];
 }
 
+// ---------- Icon injection into tabs ----------
+function injectTabIcons() {
+  if (typeof ICONS === "undefined") return;
+  document.querySelectorAll(".tab[data-tab]").forEach(tab => {
+    const key = TAB_ICONS[tab.dataset.tab];
+    if (!key || !ICONS[key]) return;
+    if (tab.querySelector("svg")) return; // already injected
+    // Strip any leading emoji from the existing label and prepend SVG
+    const raw = tab.textContent.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+    tab.innerHTML = ICONS[key] + '<span class="tab-label">' + raw + '</span>';
+  });
+}
+
 // ---------- Language switch ----------
 function applyLanguage() {
   document.documentElement.lang = lang;
@@ -86,6 +99,7 @@ function applyLanguage() {
     const key = el.dataset.i18n;
     if (UI[key]) el.textContent = t(UI[key]);
   });
+  injectTabIcons();
   document.querySelectorAll("[data-i18n-html]").forEach(el => {
     const key = el.dataset.i18nHtml;
     if (UI[key]) el.innerHTML = t(UI[key]);

@@ -1,7 +1,6 @@
-// Network-first: always fetch latest from the network, fall back to cache only when offline.
-// Prevents stale cached pages from being served after a deploy.
-const CACHE = "lynn-keto-v3";
-const ASSETS = ["./", "index.html", "styles.css", "data.js", "app.js", "gate.js", "manifest.json", "icon.svg"];
+// Network-first: always fetch latest from the network, fall back to cache when offline.
+const CACHE = "lynn-keto-v4";
+const ASSETS = ["./", "index.html", "styles.css", "data.js", "icons.js", "gate.js", "app.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));

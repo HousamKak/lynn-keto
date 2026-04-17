@@ -67,6 +67,8 @@
   const input = document.getElementById("gateInput");
   const btn = document.getElementById("gateSubmit");
   const err = document.getElementById("gateError");
+  const iconEl = document.getElementById("gateIcon");
+  if (iconEl && typeof ICONS !== "undefined") iconEl.innerHTML = ICONS.lock;
   if (!input || !btn) return;
 
   setTimeout(() => { try { input.focus(); } catch(e){} }, 80);
