@@ -509,7 +509,11 @@ header { position: relative; }
 /* ---------- Password gate ---------- */
 .gate-overlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0; left: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
   background: linear-gradient(135deg, #d62828 0%, #8a1c1c 100%);
   display: none;
   align-items: center;
@@ -517,6 +521,7 @@ header { position: relative; }
   z-index: 9999;
   padding: 20px;
   box-sizing: border-box;
+  margin: 0;
 }
 .gate-card {
   background: white;

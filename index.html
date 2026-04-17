@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="icon.svg" />
 <style>
   /* Inline: hide all app content until password is entered (prevents flash) */
+  html, body { margin: 0; padding: 0; }
   body.locked > header,
   body.locked > nav,
   body.locked > main,
@@ -18,7 +19,10 @@
   body.locked > .gate-overlay { display: flex !important; }
   body.locked {
     background: linear-gradient(135deg, #d62828 0%, #8a1c1c 100%);
-    min-height: 100vh;
+    overflow: hidden;
+    padding-bottom: 0 !important;
+    height: 100vh;
+    height: 100dvh;
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
