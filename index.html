@@ -9,9 +9,21 @@
 <link rel="stylesheet" href="styles.css" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon.svg" />
+<style>
+  /* Inline: hide all app content until password is entered (prevents flash) */
+  body.locked > header,
+  body.locked > nav,
+  body.locked > main,
+  body.locked > .modal-backdrop { display: none !important; }
+  body.locked > .gate-overlay { display: flex !important; }
+  body.locked {
+    background: linear-gradient(135deg, #d62828 0%, #8a1c1c 100%);
+    min-height: 100vh;
+  }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 </head>
-<body>
+<body class="locked">
 
 <!-- Password gate -->
 <div class="gate-overlay" id="gateOverlay">

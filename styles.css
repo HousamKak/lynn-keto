@@ -508,58 +508,76 @@ header { position: relative; }
 
 /* ---------- Password gate ---------- */
 .gate-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: linear-gradient(135deg, #d62828 0%, #8a1c1c 100%);
   display: none;
-  align-items: center; justify-content: center;
-  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
   padding: 20px;
-  transition: opacity .3s;
+  box-sizing: border-box;
 }
-.gate-overlay.show { display: flex; }
-.gate-overlay.hide { opacity: 0; pointer-events: none; }
 .gate-card {
   background: white;
   border-radius: 16px;
-  padding: 32px 28px;
-  max-width: 360px; width: 100%;
+  padding: 36px 28px;
+  max-width: 360px;
+  width: 100%;
   text-align: center;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  box-sizing: border-box;
+  direction: ltr;
 }
-.gate-icon { font-size: 48px; margin-bottom: 12px; }
+.gate-icon { font-size: 52px; margin-bottom: 12px; line-height: 1; }
 .gate-title {
   margin: 0 0 6px;
   color: var(--accent);
   font-size: 24px;
+  font-weight: 700;
 }
 .gate-sub {
   margin: 0 0 20px;
   color: var(--muted);
   font-size: 14px;
 }
-.gate-card input {
+.gate-card input[type="password"] {
   width: 100%;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 2px solid var(--border);
   border-radius: 10px;
   font-size: 18px;
   font-family: inherit;
   text-align: center;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   margin-bottom: 12px;
+  box-sizing: border-box;
+  background: #fafafa;
 }
-.gate-card input:focus {
+.gate-card input[type="password"]:focus {
   outline: none;
   border-color: var(--accent);
+  background: white;
+}
+.gate-card input.shake {
+  animation: shake .35s;
+  border-color: var(--accent);
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%,60% { transform: translateX(-8px); }
+  40%,80% { transform: translateX(8px); }
 }
 .gate-card .btn {
   width: 100%;
   padding: 12px;
   font-size: 15px;
+  box-sizing: border-box;
 }
 .gate-error {
   color: var(--accent);
   font-size: 13px;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   min-height: 18px;
+  font-weight: 600;
 }

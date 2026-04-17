@@ -1,46 +1,42 @@
 // ============================================================
-// Password gate — client-side only (not real security, just a friction barrier)
+// Password gate — client-side only (friction barrier, not real security)
+// Password: daisy
 // ============================================================
 (function () {
   const PASS_KEY = "lynn-keto-unlocked";
-  // Obfuscated password hash (not cryptographically secure, just avoids plaintext in source).
-  // password = "daisy"
-  const EXPECTED_HASH = "5aedef2-5";
+  const PASSWORD = "daisy";
 
-  function tinyHash(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-    return Math.abs(h).toString(16) + "-" + s.length.toString(16);
+  function unlock(persist) {
+    if (persist) localStorage.setItem(PASS_KEY, "1");
+    document.body.classList.remove("locked");
   }
 
-  const overlay = document.getElementById("gateOverlay");
+  // Already unlocked on this device → skip gate
+  if (localStorage.getItem(PASS_KEY) === "1") {
+    unlock(false);
+    return;
+  }
+
+  // Wait for DOM (should already be ready since script is at end of body)
   const input = document.getElementById("gateInput");
   const btn = document.getElementById("gateSubmit");
   const err = document.getElementById("gateError");
 
-  function unlock() {
-    localStorage.setItem(PASS_KEY, "1");
-    overlay.classList.add("hide");
-    setTimeout(() => overlay.remove(), 300);
-  }
+  if (!input || !btn) return;
 
-  if (localStorage.getItem(PASS_KEY) === "1") {
-    unlock();
-    return;
-  }
-
-  overlay.classList.add("show");
-  setTimeout(() => input.focus(), 50);
+  setTimeout(() => { try { input.focus(); } catch(e){} }, 80);
 
   function tryUnlock() {
-    const val = input.value.trim().toLowerCase();
-    if (tinyHash(val) === EXPECTED_HASH) {
+    const val = (input.value || "").trim().toLowerCase();
+    if (val === PASSWORD) {
       err.textContent = "";
-      unlock();
+      unlock(true);
     } else {
-      err.textContent = "Wrong password";
+      err.textContent = "Wrong password — try again";
       input.value = "";
       input.focus();
+      input.classList.add("shake");
+      setTimeout(() => input.classList.remove("shake"), 400);
     }
   }
 
