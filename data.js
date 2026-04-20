@@ -450,9 +450,8 @@ const UI = {
   col_equiv: { ar:"الكمية المعادلة", en:"Equivalent amount" },
 
   // Photos
-  photo_header: { ar:"📸 يوميات الصور", en:"📸 Photo diary" },
-  photo_sub: { ar:"احفظي صور \"قبل / أثناء / بعد\" — كل الصور محفوظة محلياً على جهازك فقط.", en:"Save \"before / during / after\" photos — all stored locally on your device only." },
-  photo_add: { ar:"📷 إضافة صورة", en:"📷 Add photo" },
+  photo_header: { ar:"📸 صور الوجبات", en:"📸 Meal photos" },
+  photo_sub: { ar:"صوّري وجباتك اليومية — كل الصور محفوظة محلياً على جهازك فقط.", en:"Snap your daily meals — all stored locally on your device only." },
   photo_full: { ar:"لا توجد مساحة كافية لحفظ الصورة. احذفي بعض الصور القديمة.", en:"Not enough storage. Delete some old photos." },
   photo_delete_confirm: { ar:"حذف هذه الصورة؟", en:"Delete this photo?" },
 
@@ -510,8 +509,8 @@ const UI = {
   empty_weight_sub: { ar:"سجّلي وزنك الأول لتبدأ متابعة تقدمك على المخطط.", en:"Log your first weight to start tracking progress on the chart." },
   empty_favs_title: { ar:"لا توجد وجبات مفضلة بعد", en:"No favorite meals yet" },
   empty_favs_sub: { ar:"اضغطي على أيقونة القلب في أي خيار من الوجبات لحفظه هنا.", en:"Tap the heart icon on any meal option to save it here for quick access." },
-  empty_photos_title: { ar:"لا توجد صور بعد", en:"No photos yet" },
-  empty_photos_sub: { ar:"احفظي صور 'قبل' و 'بعد' لرؤية تقدمك البصري خلال 28 يوماً.", en:"Save 'before' and 'after' photos to see your visual progress across 28 days." },
+  empty_photos_title: { ar:"لا توجد صور وجبات بعد", en:"No meal photos yet" },
+  empty_photos_sub: { ar:"اضغطي على زر الوجبة لإضافة صورة لها.", en:"Tap a meal button above to add a photo for it." },
 
   // Install banner
   install_title: { ar:"أضيفي التطبيق إلى الشاشة الرئيسية", en:"Add to your home screen" },

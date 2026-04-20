@@ -187,6 +187,11 @@ document.querySelectorAll(".tab").forEach(tab => {
     if (tab.dataset.tab === "favorites") renderFavorites();
   });
 });
+function switchToTab(name) {
+  const tabEl = document.querySelector(`.tab[data-tab="${name}"]`);
+  if (tabEl) tabEl.click();
+}
+const MEAL_TAB_OF = { breakfast:"breakfast", lunch:"lunch", dinner:"dinner", snack1:"snacks", snack2:"snacks" };
 
 // ---------- TODAY ----------
 function renderToday() {
@@ -236,7 +241,10 @@ function renderToday() {
   mealOrder.forEach(([key, iconKey, uiKey]) => {
     const done = dayData.meals[key];
     const row = document.createElement("div");
-    row.className = "meal-check" + (done ? " done" : "");
+    row.className = "meal-check clickable" + (done ? " done" : "");
+    row.setAttribute("role", "link");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-label", t(UI[uiKey]));
     row.innerHTML = `
       <span class="meal-icon">${ICONS[iconKey] || ""}</span>
       <div class="meal-body">
@@ -248,17 +256,32 @@ function renderToday() {
         <button class="btn-sm ${done ? "" : "success"}" data-toggle="${key}" aria-pressed="${done}">${done ? t(UI.btn_undo) : t(UI.btn_done)}</button>
       </div>
     `;
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("[data-toggle], [data-random]")) return;
+      switchToTab(MEAL_TAB_OF[key]);
+    });
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        if (e.target.closest("[data-toggle], [data-random]")) return;
+        e.preventDefault();
+        switchToTab(MEAL_TAB_OF[key]);
+      }
+    });
     mealsDiv.appendChild(row);
   });
   mealsDiv.querySelectorAll("[data-toggle]").forEach(b => {
-    b.addEventListener("click", () => {
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
       const k = b.dataset.toggle;
       dayData.meals[k] = !dayData.meals[k];
       saveState(); renderToday(); renderCalendar(); maybeCelebrateStreak();
     });
   });
   mealsDiv.querySelectorAll("[data-random]").forEach(b => {
-    b.addEventListener("click", () => openRandom(b.dataset.random));
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openRandom(b.dataset.random);
+    });
   });
 }
 function currentStreak() {
@@ -507,17 +530,75 @@ function renderCalendar() {
   }
 }
 function showDayDetails(iso, dayNum) {
-  const dd = state.days[iso] || { water: 0, meals: {} };
-  const mealKeys = { breakfast:"meal_breakfast", snack1:"meal_snack1", lunch:"meal_lunch", snack2:"meal_snack2", dinner:"meal_dinner" };
-  const mealsHtml = Object.entries(mealKeys).map(([k, uiKey]) =>
-    `<li>${dd.meals[k] ? "✅" : "⬜"} ${t(UI[uiKey])}</li>`
-  ).join("");
+  const dd = ensureDay(iso);
+  const isToday = iso === today();
   document.getElementById("modalTitle").textContent = `${t(UI.day_label)} ${localizedNumber(dayNum)} — ${formatDate(iso)}`;
-  document.getElementById("modalBody").innerHTML = `
-    <p>💧 <strong>${localizedNumber(dd.water)}/8</strong> ${t(UI.water_cups)}</p>
-    <ul style="padding-inline-start:18px">${mealsHtml}</ul>
-  `;
   document.getElementById("modalPickAgain").style.display = "none";
+  document.getElementById("modalBody").innerHTML = `
+    <div class="edit-day">
+      <div class="edit-day-section">
+        <div class="edit-day-label">💧 <span>${t(UI.water_header)}</span> <span class="edit-day-count" id="editWaterCount">${localizedNumber(dd.water)}/8</span></div>
+        <div class="water-tracker" id="editWaterTracker"></div>
+      </div>
+      <div class="edit-day-section">
+        <div class="edit-day-label">🍽️ <span>${t(UI.meals_today)}</span></div>
+        <div id="editMeals"></div>
+      </div>
+    </div>
+  `;
+
+  const onChange = () => {
+    saveState();
+    renderCalendar();
+    if (isToday) renderToday();
+    renderInsights();
+    maybeCelebrateStreak();
+  };
+  const renderEditWater = () => {
+    document.getElementById("editWaterCount").textContent = `${localizedNumber(dd.water)}/8`;
+    const wt = document.getElementById("editWaterTracker");
+    wt.innerHTML = "";
+    for (let i = 1; i <= 8; i++) {
+      const cup = document.createElement("button");
+      cup.type = "button";
+      cup.className = "water-cup" + (i <= dd.water ? " filled" : "");
+      cup.setAttribute("aria-label", `Cup ${i} of 8`);
+      cup.setAttribute("aria-pressed", i <= dd.water ? "true" : "false");
+      cup.addEventListener("click", () => {
+        dd.water = dd.water >= i ? i - 1 : i;
+        onChange();
+        renderEditWater();
+      });
+      wt.appendChild(cup);
+    }
+  };
+  const renderEditMeals = () => {
+    const order = [
+      ["breakfast","meal_breakfast"],
+      ["snack1","meal_snack1"],
+      ["lunch","meal_lunch"],
+      ["snack2","meal_snack2"],
+      ["dinner","meal_dinner"]
+    ];
+    const div = document.getElementById("editMeals");
+    div.innerHTML = "";
+    order.forEach(([k, uiKey]) => {
+      const done = !!dd.meals[k];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "meal-toggle" + (done ? " done" : "");
+      btn.setAttribute("aria-pressed", done ? "true" : "false");
+      btn.innerHTML = `<span>${t(UI[uiKey])}</span><span>${done ? "✅" : "⬜"}</span>`;
+      btn.addEventListener("click", () => {
+        dd.meals[k] = !dd.meals[k];
+        onChange();
+        renderEditMeals();
+      });
+      div.appendChild(btn);
+    });
+  };
+  renderEditWater();
+  renderEditMeals();
   document.getElementById("modal").classList.add("show");
 }
 
@@ -569,14 +650,33 @@ function mealCategoryOf(id) {
 }
 
 // ---------- PHOTOS ----------
-document.getElementById("photoInput").addEventListener("change", async e => {
-  const file = e.target.files[0]; if (!file) return;
-  const compressed = await compressImage(file, 800);
-  state.photos.push({ id: Date.now().toString(), date: today(), data: compressed });
-  try { saveState(); renderPhotos(); }
-  catch (err) { alert(t(UI.photo_full)); state.photos.pop(); }
-  e.target.value = "";
-});
+const PHOTO_MEALS = [
+  ["breakfast", "🍳", "meal_breakfast"],
+  ["lunch",     "🍽️", "meal_lunch"],
+  ["dinner",    "🌙", "meal_dinner"],
+  ["snack1",    "🥤", "meal_snack1"],
+  ["snack2",    "🥜", "meal_snack2"]
+];
+function renderPhotoMealButtons() {
+  const host = document.getElementById("photoMealButtons");
+  if (!host) return;
+  host.innerHTML = "";
+  PHOTO_MEALS.forEach(([key, icon, uiKey]) => {
+    const label = document.createElement("label");
+    label.className = "photo-upload photo-upload-meal";
+    label.dataset.meal = key;
+    label.innerHTML = `<span>${icon} ${t(UI[uiKey])}</span><input type="file" accept="image/*" capture="environment" />`;
+    label.querySelector("input").addEventListener("change", async e => {
+      const file = e.target.files[0]; if (!file) return;
+      const compressed = await compressImage(file, 800);
+      state.photos.push({ id: Date.now().toString(), date: today(), meal: key, data: compressed });
+      try { saveState(); renderPhotos(); }
+      catch (err) { alert(t(UI.photo_full)); state.photos.pop(); }
+      e.target.value = "";
+    });
+    host.appendChild(label);
+  });
+}
 function compressImage(file, maxWidth) {
   return new Promise(resolve => {
     const reader = new FileReader();
@@ -600,18 +700,38 @@ function renderPhotos() {
   grid.innerHTML = "";
   if (state.photos.length === 0) {
     grid.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state">
         <div class="empty-state-icon">${ICONS.camera}</div>
         <h4>${t(UI.empty_photos_title)}</h4>
         <p>${t(UI.empty_photos_sub)}</p>
       </div>`;
     return;
   }
-  [...state.photos].reverse().forEach(p => {
-    const div = document.createElement("div");
-    div.className = "photo-item";
-    div.innerHTML = `<img src="${p.data}" alt="Progress photo from ${p.date}" /><div class="date">${p.date}</div><button class="del" data-id="${p.id}" aria-label="Delete photo">${ICONS.x}</button>`;
-    grid.appendChild(div);
+  const MEAL_META = Object.fromEntries(PHOTO_MEALS.map(([k, icon, uiKey]) => [k, { icon, uiKey }]));
+  const byDate = {};
+  state.photos.forEach(p => { (byDate[p.date] = byDate[p.date] || []).push(p); });
+  const dates = Object.keys(byDate).sort().reverse();
+  dates.forEach(date => {
+    const group = document.createElement("div");
+    group.className = "photo-date-group";
+    const header = document.createElement("div");
+    header.className = "photo-date-header";
+    header.textContent = formatDate(date);
+    group.appendChild(header);
+    const inner = document.createElement("div");
+    inner.className = "photo-grid-inner";
+    byDate[date].slice().reverse().forEach(p => {
+      const meta = p.meal && MEAL_META[p.meal];
+      const badge = meta
+        ? `<div class="meal-badge">${meta.icon} ${t(UI[meta.uiKey])}</div>`
+        : "";
+      const div = document.createElement("div");
+      div.className = "photo-item";
+      div.innerHTML = `<img src="${p.data}" alt="Meal photo from ${p.date}" />${badge}<button class="del" data-id="${p.id}" aria-label="Delete photo">${ICONS.x}</button>`;
+      inner.appendChild(div);
+    });
+    group.appendChild(inner);
+    grid.appendChild(group);
   });
   grid.querySelectorAll(".del").forEach(b => {
     b.addEventListener("click", () => {
@@ -745,6 +865,7 @@ function renderAll() {
   renderWeight();
   renderCalendar();
   renderFavorites();
+  renderPhotoMealButtons();
   renderPhotos();
   renderPersonInfo();
   renderStartDateDisplay();
