@@ -1311,19 +1311,19 @@ function doPrint() {
   const rpt = document.getElementById("printReport");
   if (!rpt) return;
 
-  // Position off-screen but with real layout so Chart.js can size the canvas.
-  // (Without this, #printReport is display:none on screen and the chart
-  // initializes with zero dimensions, which breaks the whole report layout.)
-  const prev = rpt.style.cssText;
-  rpt.style.cssText = "display:block;position:fixed;left:-99999px;top:0;width:186mm;background:white;z-index:-1;";
+  // Stage off-screen with a real width so Chart.js can size the canvas.
+  // (Without a real width the chart paints with zero dimensions and the
+  // whole report collapses to one blank page.)
+  rpt.style.cssText = "display:block;position:fixed;top:-99999px;left:0;width:186mm;background:white;";
 
   renderPrintReport();
 
-  // Give Chart.js two frames + a short tick to paint, then print and restore.
+  // Let Chart.js paint, THEN clear the off-screen inline styles so the
+  // element is positioned normally during print. The chart bitmap survives.
   setTimeout(() => {
+    rpt.style.cssText = "";
     window.print();
-    setTimeout(() => { rpt.style.cssText = prev; }, 600);
-  }, 120);
+  }, 200);
 }
 
 // ---------- Render all ----------
