@@ -1244,14 +1244,14 @@ function renderPrintReport() {
       </div>
     </div>
 
-    <section class="rpt-section">
+    <div class="rpt-section">
       <h2>${t(UI.rpt_summary)}</h2>
       <div class="rpt-summary-grid">
         ${summary.map(([l,v]) => `<div class="rpt-stat"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("")}
       </div>
-    </section>
+    </div>
 
-    <section class="rpt-section">
+    <div class="rpt-section">
       <h2>${t(UI.rpt_weight_section)}</h2>
       ${ws.length ? `
         <div class="rpt-chart-wrap"><canvas id="rptWeightChart"></canvas></div>
@@ -1270,21 +1270,21 @@ function renderPrintReport() {
           </tbody>
         </table>
       ` : `<p>${t(UI.rpt_weight_none)}</p>`}
-    </section>
+    </div>
 
-    <section class="rpt-section rpt-page-break">
+    <div class="rpt-section rpt-page-break">
       <h2>${t(UI.rpt_adherence)}</h2>
       ${calHtml}
       <p class="rpt-legend">${t(UI.rpt_legend)}</p>
-    </section>
+    </div>
 
-    <section class="rpt-section">
+    <div class="rpt-section">
       <h2>${t(UI.rpt_cheats_section)}</h2>
       <p class="rpt-breakdown">${breakdown}</p>
       ${cheatsHtml}
-    </section>
+    </div>
 
-    <footer class="rpt-foot">${t(UI.rpt_footer)} · ${formatDate(today())}</footer>
+    <div class="rpt-foot">${t(UI.rpt_footer)} · ${formatDate(today())}</div>
   `;
 
   // Render weight chart inside the report
