@@ -1204,10 +1204,388 @@ table th {
   }
 }
 
+/* ---------- Cheats ---------- */
+#today .today-grid > .cheat-stat { grid-column: 1 / -1; }
+.cheat-stat.has-cheats {
+  background: linear-gradient(145deg, #FEE2E2 0%, #FECACA 100%);
+  border-color: #FCA5A5;
+}
+.cheat-stat.has-cheats .val { color: var(--danger); }
+.cheat-stat:not(.has-cheats) .val { color: var(--accent-600); }
+
+.cheat-kind-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  margin: var(--s-3) 0 var(--s-4);
+  padding: var(--s-1);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+.cheat-kind-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--dur-quick);
+}
+.cheat-kind-btn.excess.active {
+  background: #FEF3C7;
+  color: #92400E;
+  box-shadow: var(--shadow-sm);
+}
+.cheat-kind-btn.banned.active {
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: var(--shadow-sm);
+}
+
+.cheat-form { display: block; }
+.cheat-form-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 110px) 1fr;
+  gap: var(--s-3);
+  align-items: center;
+  margin-bottom: var(--s-3);
+}
+.cheat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.cheat-form input[type="text"],
+.cheat-form input[type="date"],
+.cheat-form select,
+.cheat-form textarea {
+  width: 100%;
+  padding: var(--s-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.cheat-form textarea { resize: vertical; min-height: 56px; }
+.cheat-form input:focus,
+.cheat-form select:focus,
+.cheat-form textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+.cheat-help {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 var(--s-2);
+}
+#cheatLogBtn { width: 100%; margin-top: var(--s-2); }
+
+.cheat-date-group { margin-bottom: var(--s-4); }
+.cheat-date-header {
+  font-weight: 700;
+  color: var(--primary-700);
+  font-size: 13px;
+  margin: 0 0 var(--s-2);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.02em;
+}
+.cheat-entry {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--warn);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  margin-bottom: var(--s-2);
+  box-shadow: var(--shadow-xs);
+}
+.cheat-entry.kind-banned { border-inline-start-color: var(--danger); }
+.cheat-entry-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.cheat-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.cheat-badge.excess { background: #FEF3C7; color: #92400E; }
+.cheat-badge.banned { background: var(--danger-soft); color: var(--danger); }
+.cheat-entry-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+.cheat-del {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cheat-del:hover { background: var(--danger-soft); color: var(--danger); }
+.cheat-del svg { width: 16px; height: 16px; }
+.cheat-entry-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: var(--s-1);
+}
+.cheat-entry-note {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: var(--s-1);
+  font-style: italic;
+}
+.cheat-day-empty {
+  font-size: 13px;
+  color: var(--accent-600);
+  background: var(--accent-soft);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+}
+
+/* Calendar cheat dot */
+.cal-day { position: relative; }
+.cal-day-num { display: inline-block; }
+.cal-cheat-dot {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.cal-day.has-cheat[data-score="6"] .cal-cheat-dot,
+.cal-day.has-cheat[data-score="5"] .cal-cheat-dot {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.7);
+}
+
+@media (max-width: 600px) {
+  .cheat-form-row { grid-template-columns: 1fr; gap: var(--s-1); }
+  .cheat-label { font-size: 12px; }
+}
+
+/* ---------- Printable report (hidden on screen) ---------- */
+#printReport { display: none; }
+
 /* ---------- Print ---------- */
 @media print {
-  .tabs, .lang-toggle, .modal-backdrop, .gate-overlay { display: none !important; }
-  section { display: block !important; page-break-before: always; }
-  section:first-of-type { page-break-before: auto; }
-  header { background: white; color: var(--primary-700); }
+  @page { size: A4; margin: 14mm 12mm; }
+
+  /* Hide the entire on-screen app */
+  body { background: white !important; padding: 0 !important; margin: 0 !important; color: #111 !important; font-size: 10.5pt; line-height: 1.45; }
+  body > * { display: none !important; }
+  body > #printReport { display: block !important; }
+
+  #printReport, #printReport * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-shadow: none !important;
+  }
+
+  /* Report header */
+  .rpt-head {
+    border-bottom: 2pt solid #111;
+    padding-bottom: 6pt;
+    margin-bottom: 14pt;
+  }
+  .rpt-head h1 {
+    margin: 0 0 4pt;
+    font-size: 18pt;
+    font-weight: 700;
+    color: #111;
+  }
+  .rpt-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12pt;
+    font-size: 9.5pt;
+    color: #444;
+  }
+
+  /* Sections */
+  .rpt-section {
+    margin: 0 0 14pt;
+    page-break-inside: avoid;
+  }
+  .rpt-section h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    margin: 0 0 8pt;
+    padding-bottom: 3pt;
+    border-bottom: 1pt solid #999;
+    color: #111;
+  }
+  .rpt-section h3, .rpt-section h4 {
+    font-size: 11pt;
+    margin: 8pt 0 4pt;
+    color: #222;
+  }
+  .rpt-page-break { page-break-before: always; }
+
+  /* Summary grid */
+  .rpt-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6pt;
+  }
+  .rpt-stat {
+    border: 0.6pt solid #bbb;
+    border-radius: 4pt;
+    padding: 6pt 8pt;
+  }
+  .rpt-stat .lbl {
+    font-size: 8.5pt;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2pt;
+  }
+  .rpt-stat .val {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #111;
+  }
+
+  /* Weight table + chart */
+  .rpt-chart-wrap {
+    width: 100%;
+    height: 60mm;
+    margin-bottom: 8pt;
+  }
+  .rpt-chart-wrap canvas {
+    max-width: 100% !important;
+    max-height: 60mm !important;
+  }
+  .rpt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin-top: 4pt;
+  }
+  .rpt-table th, .rpt-table td {
+    border: 0.5pt solid #bbb;
+    padding: 3pt 6pt;
+    text-align: left;
+  }
+  .rpt-table th {
+    background: #f3f3f3;
+    font-weight: 700;
+  }
+
+  /* Calendar grid */
+  .rpt-cal {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3pt;
+  }
+  .rpt-cell {
+    aspect-ratio: 1;
+    border-radius: 3pt;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    font-weight: 700;
+    border: 0.5pt solid #999;
+    position: relative;
+    min-height: 16mm;
+  }
+  .rpt-cell-dot {
+    position: absolute;
+    top: 2pt;
+    inset-inline-end: 2pt;
+    width: 6pt;
+    height: 6pt;
+    border-radius: 50%;
+    background: #dc2626;
+    border: 0.5pt solid #fff;
+  }
+  .rpt-legend {
+    margin-top: 6pt;
+    font-size: 9pt;
+    color: #555;
+  }
+
+  /* Cheats list */
+  .rpt-breakdown {
+    font-weight: 600;
+    margin: 0 0 8pt;
+    font-size: 10.5pt;
+    color: #111;
+  }
+  .rpt-clean { color: #15803d; font-weight: 600; }
+  .rpt-cheat-day {
+    page-break-inside: avoid;
+    margin-bottom: 8pt;
+    padding: 6pt 8pt;
+    border: 0.5pt solid #ddd;
+    border-radius: 4pt;
+  }
+  .rpt-cheat-day h4 {
+    margin: 0 0 4pt;
+    font-size: 10.5pt;
+    color: #111;
+    border-bottom: 0.5pt dotted #bbb;
+    padding-bottom: 2pt;
+  }
+  .rpt-cheat-day ul {
+    margin: 0;
+    padding-inline-start: 16pt;
+  }
+  .rpt-cheat-day li {
+    margin-bottom: 4pt;
+    font-size: 10pt;
+  }
+  .rpt-cheat-note {
+    font-style: italic;
+    font-size: 9pt;
+    color: #555;
+    margin-top: 1pt;
+  }
+  .rpt-tag {
+    display: inline-block;
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 1pt 5pt;
+    border-radius: 8pt;
+    margin-inline-end: 4pt;
+    letter-spacing: 0.04em;
+  }
+  .rpt-tag.excess { background: #fef3c7; color: #92400e; border: 0.5pt solid #f59e0b; }
+  .rpt-tag.banned { background: #fee2e2; color: #991b1b; border: 0.5pt solid #dc2626; }
+
+  /* Footer */
+  .rpt-foot {
+    margin-top: 18pt;
+    padding-top: 6pt;
+    border-top: 0.5pt solid #999;
+    font-size: 8.5pt;
+    color: #777;
+    text-align: center;
+  }
 }

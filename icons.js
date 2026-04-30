@@ -42,5 +42,6 @@ const TAB_ICONS = {
   allowed: "check",
   photos: "camera",
   favorites: "heart",
+  cheats: "cookie",
   settings: "settings"
 };

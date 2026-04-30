@@ -61,6 +61,7 @@
   <button class="tab" data-tab="allowed" data-i18n="tab_allowed">✅ المسموحات</button>
   <button class="tab" data-tab="photos" data-i18n="tab_photos">📸 الصور</button>
   <button class="tab" data-tab="favorites" data-i18n="tab_favorites">❤️ المفضلة</button>
+  <button class="tab" data-tab="cheats" data-i18n="tab_cheats">🍩 الغش</button>
   <button class="tab" data-tab="settings" data-i18n="tab_settings">⚙️ الإعدادات</button>
 </nav>
 
@@ -80,6 +81,7 @@
       <div class="today-stat"><span class="val" id="statStreak">0 🔥</span><span class="lbl" data-i18n="stat_streak">أيام متتالية</span></div>
       <div class="today-stat"><span class="val" id="statWater">0/8</span><span class="lbl" data-i18n="stat_water">كاسات ماء</span></div>
       <div class="today-stat"><span class="val" id="statMeals">0/5</span><span class="lbl" data-i18n="stat_meals">وجبات اليوم</span></div>
+      <div class="today-stat cheat-stat" id="cheatStatTile"><span class="val" id="statCheats">0</span><span class="lbl" data-i18n="stat_cheats">غش اليوم</span></div>
     </div>
     <div class="progress-bar"><div class="fill" id="dayProgress" style="width:0%"></div></div>
   </div>
@@ -240,6 +242,71 @@
   </div>
 </section>
 
+<!-- CHEATS -->
+<section id="cheats">
+  <div class="card">
+    <h2 data-i18n="cheats_header">🍩 سجل الغش</h2>
+    <p class="text-muted" data-i18n="cheats_sub">سجّلي أي شيء أكلتيه خارج النظام أو بكميات زائدة عن المسموح.</p>
+
+    <div class="cheat-kind-toggle" id="cheatKindToggle" role="tablist" aria-label="Cheat type">
+      <button type="button" class="cheat-kind-btn excess active" data-cheat-kind="excess" data-i18n="cheat_kind_excess">زيادة عن المسموح</button>
+      <button type="button" class="cheat-kind-btn banned" data-cheat-kind="banned" data-i18n="cheat_kind_banned">ممنوع</button>
+    </div>
+
+    <div class="cheat-form">
+      <div class="cheat-form-row">
+        <label class="cheat-label" for="cheatDate" data-i18n="cheat_date">التاريخ</label>
+        <input type="date" id="cheatDate" />
+      </div>
+
+      <div id="cheatExcessFields">
+        <p class="cheat-help" data-i18n="cheat_excess_help">اختاري عنصراً من قوائم النظام تجاوزت كميته.</p>
+        <div class="cheat-form-row">
+          <label class="cheat-label" for="cheatExcessCategory" data-i18n="cheat_category">الفئة</label>
+          <select id="cheatExcessCategory"></select>
+        </div>
+        <div class="cheat-form-row">
+          <label class="cheat-label" for="cheatExcessItem" data-i18n="cheat_item">العنصر</label>
+          <select id="cheatExcessItem"></select>
+        </div>
+        <div class="cheat-form-row">
+          <label class="cheat-label" for="cheatExcessQty" data-i18n="cheat_qty">الكمية / الحجم</label>
+          <input type="text" id="cheatExcessQty" data-i18n-placeholder="cheat_qty_placeholder" placeholder="مثلاً: 2x المسموح، كوب" />
+        </div>
+      </div>
+
+      <div id="cheatBannedFields" hidden>
+        <p class="cheat-help" data-i18n="cheat_banned_help">اكتبي ما أكلتيه (مثلاً: قطعة كاتو، شريحة بيتزا، علبة شيبس).</p>
+        <div class="cheat-form-row">
+          <label class="cheat-label" for="cheatBannedName" data-i18n="cheat_item">العنصر</label>
+          <input type="text" id="cheatBannedName" data-i18n-placeholder="cheat_name_placeholder" placeholder="اسم الطعام" />
+        </div>
+        <div class="cheat-form-row">
+          <label class="cheat-label" for="cheatBannedQty" data-i18n="cheat_qty">الكمية / الحجم</label>
+          <input type="text" id="cheatBannedQty" data-i18n-placeholder="cheat_qty_placeholder" placeholder="مثلاً: 2x المسموح، كوب" />
+        </div>
+      </div>
+
+      <div class="cheat-form-row">
+        <label class="cheat-label" for="cheatNote" data-i18n="cheat_note">ملاحظة</label>
+        <textarea id="cheatNote" rows="2" data-i18n-placeholder="cheat_note_placeholder" placeholder="اختياري — متى، لماذا، كيف شعرتِ…"></textarea>
+      </div>
+
+      <button class="btn btn-primary" id="cheatLogBtn" data-i18n="btn_log_cheat">➕ تسجيل الغش</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 data-i18n="cheat_stats">الإحصائيات</h3>
+    <div class="today-grid" id="cheatStatsGrid"></div>
+  </div>
+
+  <div class="card">
+    <h3 data-i18n="cheat_recent">السجل الأخير</h3>
+    <div id="cheatLogList"></div>
+  </div>
+</section>
+
 <!-- SETTINGS -->
 <section id="settings">
   <div class="card">
@@ -268,7 +335,7 @@
         <span data-i18n="btn_import">📥 استيراد</span>
         <input type="file" id="importData" accept=".json" style="display:none" />
       </label>
-      <button class="btn btn-secondary" onclick="window.print()" data-i18n="btn_print">🖨️ طباعة</button>
+      <button class="btn btn-secondary" id="printBtn" data-i18n="btn_print">🖨️ طباعة</button>
     </div>
     <h3 style="color:var(--accent)" data-i18n="danger_zone">منطقة الخطر</h3>
     <button class="btn" style="background:#ef4444;color:white" id="resetAll" data-i18n="btn_reset_all">🗑️ مسح جميع البيانات</button>
@@ -291,6 +358,9 @@
 <!-- Toast + confetti mount points -->
 <div id="toastHost" role="region" aria-live="polite" aria-label="Notifications"></div>
 <div id="confettiHost" aria-hidden="true"></div>
+
+<!-- Printable report (hidden on screen, shown on print) -->
+<div id="printReport" aria-hidden="true"></div>
 
 <script src="data.js"></script>
 <script src="icons.js"></script>

@@ -38,7 +38,8 @@ function defaultState() {
     weights: [],
     favorites: [],
     shopping: {},
-    photos: []
+    photos: [],
+    cheats: {}
   };
 }
 let state = loadState();
@@ -185,6 +186,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     if (tab.dataset.tab === "weight") renderWeightChart();
     if (tab.dataset.tab === "calendar") renderCalendar();
     if (tab.dataset.tab === "favorites") renderFavorites();
+    if (tab.dataset.tab === "cheats") renderCheatsTab();
   });
 });
 function switchToTab(name) {
@@ -208,6 +210,11 @@ function renderToday() {
   const mealCount = Object.values(dayData.meals).filter(Boolean).length;
   document.getElementById("statMeals").textContent = `${localizedNumber(mealCount)}/5`;
   document.getElementById("statStreak").textContent = `${localizedNumber(currentStreak())} 🔥`;
+
+  const cheatsToday = (state.cheats[iso] || []).length;
+  const cheatTile = document.getElementById("cheatStatTile");
+  document.getElementById("statCheats").textContent = localizedNumber(cheatsToday);
+  if (cheatTile) cheatTile.classList.toggle("has-cheats", cheatsToday > 0);
 
   const dayScore = mealCount + (dayData.water >= 8 ? 1 : 0);
   document.getElementById("dayProgress").style.width = ((dayScore/6)*100) + "%";
@@ -283,6 +290,18 @@ function renderToday() {
       openRandom(b.dataset.random);
     });
   });
+
+  const cheatTileEl = document.getElementById("cheatStatTile");
+  if (cheatTileEl && !cheatTileEl.dataset.bound) {
+    cheatTileEl.dataset.bound = "1";
+    cheatTileEl.style.cursor = "pointer";
+    cheatTileEl.setAttribute("role", "link");
+    cheatTileEl.setAttribute("tabindex", "0");
+    cheatTileEl.addEventListener("click", () => switchToTab("cheats"));
+    cheatTileEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchToTab("cheats"); }
+    });
+  }
 }
 function currentStreak() {
   if (!state.startDate) return 0;
@@ -515,13 +534,15 @@ function renderCalendar() {
     const dd = state.days[iso];
     let score = 0;
     if (dd) score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
+    const cheatCount = (state.cheats[iso] || []).length;
     const cell = document.createElement("div");
     cell.className = "cal-day";
     cell.dataset.score = score;
-    cell.textContent = localizedNumber(i+1);
+    cell.innerHTML = `<span class="cal-day-num">${localizedNumber(i+1)}</span>${cheatCount ? '<span class="cal-cheat-dot" aria-hidden="true"></span>' : ""}`;
     if (iso === todayIso) cell.classList.add("today");
     if (iso > todayIso) cell.classList.add("future");
-    cell.title = `${iso} — ${score}/6`;
+    if (cheatCount) cell.classList.add("has-cheat");
+    cell.title = `${iso} — ${score}/6${cheatCount ? ` · ${cheatCount} cheat${cheatCount>1?"s":""}` : ""}`;
     cell.addEventListener("click", () => {
       if (iso > todayIso) return;
       showDayDetails(iso, i+1);
@@ -543,6 +564,10 @@ function showDayDetails(iso, dayNum) {
       <div class="edit-day-section">
         <div class="edit-day-label">🍽️ <span>${t(UI.meals_today)}</span></div>
         <div id="editMeals"></div>
+      </div>
+      <div class="edit-day-section">
+        <div class="edit-day-label">🍩 <span>${t(UI.cheat_day_modal_label)}</span></div>
+        <div id="editCheats"></div>
       </div>
     </div>
   `;
@@ -597,8 +622,40 @@ function showDayDetails(iso, dayNum) {
       div.appendChild(btn);
     });
   };
+  const renderEditCheats = () => {
+    const div = document.getElementById("editCheats");
+    if (!div) return;
+    const list = state.cheats[iso] || [];
+    if (list.length === 0) {
+      div.innerHTML = `<div class="cheat-day-empty">${t(UI.cheat_day_none)}</div>`;
+      return;
+    }
+    div.innerHTML = list.map(c => `
+      <div class="cheat-entry kind-${c.kind}">
+        <div class="cheat-entry-head">
+          <span class="cheat-badge ${c.kind}">${t(UI["cheat_kind_" + c.kind])}</span>
+          <span class="cheat-entry-name">${formatCheatTitle(c)}</span>
+          <button class="cheat-del" data-cheat-del="${c.id}" aria-label="Delete">${ICONS.x}</button>
+        </div>
+        ${c.qty ? `<div class="cheat-entry-meta">${t(UI.cheat_qty)}: ${escapeHtml(c.qty)}</div>` : ""}
+        ${c.note ? `<div class="cheat-entry-note">${escapeHtml(c.note)}</div>` : ""}
+      </div>
+    `).join("");
+    div.querySelectorAll("[data-cheat-del]").forEach(b => {
+      b.addEventListener("click", () => {
+        if (!confirm(t(UI.cheat_delete_confirm))) return;
+        deleteCheat(iso, b.dataset.cheatDel);
+        renderEditCheats();
+        renderCalendar();
+        renderCheatsTab();
+        if (isToday) renderToday();
+      });
+    });
+  };
+
   renderEditWater();
   renderEditMeals();
+  renderEditCheats();
   document.getElementById("modal").classList.add("show");
 }
 
@@ -795,6 +852,7 @@ document.getElementById("importData").addEventListener("change", async e => {
     saveState(); location.reload();
   } catch { alert(t(UI.invalid_file)); }
 });
+document.getElementById("printBtn").addEventListener("click", doPrint);
 document.getElementById("resetAll").addEventListener("click", () => {
   if (!confirm(t(UI.reset_confirm1))) return;
   if (!confirm(t(UI.reset_confirm2))) return;
@@ -856,6 +914,405 @@ function renderInsights() {
   `;
 }
 
+// ---------- CHEATS ----------
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function mealOptionLabel(m) {
+  const title = m.title ? ` — ${t(m.title)}` : "";
+  return `${t(UI.option_label)} ${t(m.num)}${title}`;
+}
+
+const CHEAT_EXCESS_CATEGORIES = [
+  { key:"veg",       label:"cheat_cat_veg",     items: () => VEGETABLES.map((v,i) => ({ id:"veg-"+i, label: t(v) })) },
+  { key:"sauces",    label:"cheat_cat_sauces",  items: () => SAUCES.map((s,i)     => ({ id:"sauce-"+i, label: t(s.name) })) },
+  { key:"drinks",    label:"cheat_cat_drinks",  items: () => DRINKS.map((d,i)     => ({ id:"drink-"+i, label: t(d) })) },
+  { key:"fats",      label:"cheat_cat_fats",    items: () => FAT_EXCHANGE.map(([n],i) => ({ id:"fat-"+i, label: t(n) })) },
+  { key:"breakfast", label:"meal_breakfast",    items: () => BREAKFAST.map(m => ({ id:m.id, label: mealOptionLabel(m) })) },
+  { key:"lunch",     label:"meal_lunch",        items: () => LUNCH.map(m     => ({ id:m.id, label: mealOptionLabel(m) })) },
+  { key:"dinner",    label:"meal_dinner",       items: () => DINNER.map(m    => ({ id:m.id, label: mealOptionLabel(m) })) },
+  { key:"snack1",    label:"meal_snack1",       items: () => SNACK1.map(m    => ({ id:m.id, label: mealOptionLabel(m) })) },
+  { key:"snack2",    label:"meal_snack2",       items: () => SNACK2.map(m    => ({ id:m.id, label: mealOptionLabel(m) })) }
+];
+const CHEAT_CAT_BY_KEY = Object.fromEntries(CHEAT_EXCESS_CATEGORIES.map(c => [c.key, c]));
+
+function formatCheatTitle(c) {
+  if (c.kind === "banned") return escapeHtml(c.name || "—");
+  // excess: stored category key + label snapshot
+  return escapeHtml(c.name || "—");
+}
+
+function totalCheats() {
+  return Object.values(state.cheats).reduce((sum, list) => sum + list.length, 0);
+}
+function cheatsInLastDays(n) {
+  const now = new Date(today());
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0,10);
+    count += (state.cheats[iso] || []).length;
+  }
+  return count;
+}
+function cleanDaysIn28() {
+  if (!state.startDate) return 0;
+  const start = new Date(state.startDate);
+  const todayIso = today();
+  let clean = 0;
+  for (let i = 0; i < PERSON.durationDays; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0,10);
+    if (iso > todayIso) continue;
+    if (!(state.cheats[iso] || []).length) clean++;
+  }
+  return clean;
+}
+
+function deleteCheat(iso, id) {
+  const list = state.cheats[iso] || [];
+  state.cheats[iso] = list.filter(c => c.id !== id);
+  if (state.cheats[iso].length === 0) delete state.cheats[iso];
+  saveState();
+}
+
+function getCheatKind() {
+  const active = document.querySelector(".cheat-kind-btn.active");
+  return active ? active.dataset.cheatKind : "excess";
+}
+
+function populateExcessCategorySelect() {
+  const cat = document.getElementById("cheatExcessCategory");
+  if (!cat) return;
+  cat.innerHTML = `<option value="">${t(UI.cheat_select_category)}</option>` +
+    CHEAT_EXCESS_CATEGORIES.map(c => `<option value="${c.key}">${t(UI[c.label])}</option>`).join("");
+  populateExcessItemSelect();
+}
+function populateExcessItemSelect() {
+  const itemSel = document.getElementById("cheatExcessItem");
+  const catKey = document.getElementById("cheatExcessCategory")?.value;
+  if (!itemSel) return;
+  if (!catKey) {
+    itemSel.innerHTML = `<option value="">${t(UI.cheat_select_item)}</option>`;
+    itemSel.disabled = true;
+    return;
+  }
+  const cat = CHEAT_CAT_BY_KEY[catKey];
+  const opts = cat.items();
+  itemSel.disabled = false;
+  itemSel.innerHTML = `<option value="">${t(UI.cheat_select_item)}</option>` +
+    opts.map(o => `<option value="${escapeHtml(o.id)}" data-label="${escapeHtml(o.label)}">${escapeHtml(o.label)}</option>`).join("");
+}
+
+function renderCheatsTab() {
+  // Stats card
+  const grid = document.getElementById("cheatStatsGrid");
+  if (grid) {
+    const stats = [
+      [localizedNumber((state.cheats[today()] || []).length), t(UI.cheat_stat_today)],
+      [localizedNumber(cheatsInLastDays(7)), t(UI.cheat_stat_week)],
+      [localizedNumber(totalCheats()), t(UI.cheat_stat_total)],
+      [`${localizedNumber(cleanDaysIn28())}/${localizedNumber(PERSON.durationDays)}`, t(UI.cheat_stat_clean)]
+    ];
+    grid.innerHTML = stats.map(([v,l]) =>
+      `<div class="today-stat"><span class="val">${v}</span><span class="lbl">${l}</span></div>`
+    ).join("");
+  }
+
+  // Recent log: all entries grouped by date desc
+  const list = document.getElementById("cheatLogList");
+  if (!list) return;
+  const dates = Object.keys(state.cheats).filter(d => state.cheats[d].length).sort().reverse();
+  if (dates.length === 0) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">${ICONS.cookie}</div>
+      <h4>${t(UI.cheat_empty_all)}</h4>
+    </div>`;
+    return;
+  }
+  list.innerHTML = dates.map(date => {
+    const entries = state.cheats[date].slice().reverse();
+    return `
+      <div class="cheat-date-group">
+        <div class="cheat-date-header">${formatDate(date)}</div>
+        ${entries.map(c => `
+          <div class="cheat-entry kind-${c.kind}">
+            <div class="cheat-entry-head">
+              <span class="cheat-badge ${c.kind}">${t(UI["cheat_kind_" + c.kind])}</span>
+              <span class="cheat-entry-name">${formatCheatTitle(c)}</span>
+              <button class="cheat-del" data-cheat-del="${c.id}" data-cheat-date="${date}" aria-label="Delete">${ICONS.x}</button>
+            </div>
+            ${c.qty ? `<div class="cheat-entry-meta">${t(UI.cheat_qty)}: ${escapeHtml(c.qty)}</div>` : ""}
+            ${c.note ? `<div class="cheat-entry-note">${escapeHtml(c.note)}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+  list.querySelectorAll("[data-cheat-del]").forEach(b => {
+    b.addEventListener("click", () => {
+      if (!confirm(t(UI.cheat_delete_confirm))) return;
+      deleteCheat(b.dataset.cheatDate, b.dataset.cheatDel);
+      renderCheatsTab();
+      renderCalendar();
+      renderToday();
+    });
+  });
+}
+
+function setupCheatForm() {
+  const dateInput = document.getElementById("cheatDate");
+  if (dateInput && !dateInput.value) dateInput.value = today();
+
+  document.querySelectorAll(".cheat-kind-btn").forEach(b => {
+    if (b.dataset.bound) return;
+    b.dataset.bound = "1";
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".cheat-kind-btn").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      const kind = b.dataset.cheatKind;
+      document.getElementById("cheatExcessFields").hidden = kind !== "excess";
+      document.getElementById("cheatBannedFields").hidden = kind !== "banned";
+    });
+  });
+
+  const catSel = document.getElementById("cheatExcessCategory");
+  if (catSel && !catSel.dataset.bound) {
+    catSel.dataset.bound = "1";
+    catSel.addEventListener("change", populateExcessItemSelect);
+  }
+  populateExcessCategorySelect();
+
+  const logBtn = document.getElementById("cheatLogBtn");
+  if (logBtn && !logBtn.dataset.bound) {
+    logBtn.dataset.bound = "1";
+    logBtn.addEventListener("click", submitCheat);
+  }
+}
+
+function submitCheat() {
+  const kind = getCheatKind();
+  const date = document.getElementById("cheatDate").value || today();
+  const note = document.getElementById("cheatNote").value.trim();
+  let entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), kind, ts: new Date().toISOString(), note };
+
+  if (kind === "excess") {
+    const catKey = document.getElementById("cheatExcessCategory").value;
+    const itemSel = document.getElementById("cheatExcessItem");
+    const itemId = itemSel.value;
+    if (!catKey || !itemId) { alert(t(UI.cheat_select_item)); return; }
+    const label = itemSel.options[itemSel.selectedIndex].dataset.label || itemSel.options[itemSel.selectedIndex].text;
+    entry.category = catKey;
+    entry.itemId = itemId;
+    entry.name = label;
+    entry.qty = document.getElementById("cheatExcessQty").value.trim();
+  } else {
+    const name = document.getElementById("cheatBannedName").value.trim();
+    if (!name) { alert(t(UI.cheat_name_placeholder)); return; }
+    entry.name = name;
+    entry.qty = document.getElementById("cheatBannedQty").value.trim();
+  }
+
+  if (!state.cheats[date]) state.cheats[date] = [];
+  state.cheats[date].push(entry);
+  saveState();
+
+  // Reset inputs
+  document.getElementById("cheatNote").value = "";
+  if (kind === "excess") {
+    document.getElementById("cheatExcessQty").value = "";
+  } else {
+    document.getElementById("cheatBannedName").value = "";
+    document.getElementById("cheatBannedQty").value = "";
+  }
+
+  toast(t(UI.cheat_logged), formatDate(date));
+  renderCheatsTab();
+  renderCalendar();
+  renderToday();
+}
+
+// ---------- PRINT REPORT ----------
+let rptChart = null;
+
+function renderPrintReport() {
+  const host = document.getElementById("printReport");
+  if (!host) return;
+
+  const ws = state.weights.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const first = ws[0];
+  const last = ws[ws.length - 1];
+  const lostKg = (first && last) ? (first.kg - last.kg) : null;
+  const toGoal = last ? Math.max(0, last.kg - PERSON.ibw) : null;
+
+  // Adherence aggregates
+  let mealsLogged = 0, waterTotal = 0, fullDays = 0;
+  Object.values(state.days).forEach(d => {
+    const m = Object.values(d.meals).filter(Boolean).length;
+    mealsLogged += m;
+    waterTotal += d.water || 0;
+    if (m === 5 && d.water >= 8) fullDays++;
+  });
+
+  // Cheat aggregates
+  const cheatDates = Object.keys(state.cheats).filter(d => state.cheats[d].length).sort();
+  let excessCount = 0, bannedCount = 0;
+  cheatDates.forEach(d => state.cheats[d].forEach(c => {
+    if (c.kind === "excess") excessCount++; else bannedCount++;
+  }));
+  const totalCheat = excessCount + bannedCount;
+
+  const fmtKg = v => (v == null ? "—" : v.toFixed(1) + " " + t(UI.kg));
+  const summary = [
+    [t(UI.rpt_starting_w), PERSON.weight + " " + t(UI.kg)],
+    [t(UI.rpt_current_w), last ? last.kg.toFixed(1) + " " + t(UI.kg) : "—"],
+    [t(UI.rpt_lost), lostKg == null ? "—" : (lostKg >= 0 ? "" : "+") + Math.abs(lostKg).toFixed(1) + " " + t(UI.kg)],
+    [t(UI.rpt_goal), PERSON.ibw + " " + t(UI.kg)],
+    [t(UI.rpt_remaining), fmtKg(toGoal)],
+    [t(UI.rpt_streak), `${currentStreak()} ${t(UI.days)}`],
+    [t(UI.rpt_full_days), `${fullDays} ${t(UI.days)}`],
+    [t(UI.rpt_meals_logged), String(mealsLogged)],
+    [t(UI.rpt_water_total), String(waterTotal)],
+    [t(UI.rpt_total_cheats), String(totalCheat)],
+    [t(UI.rpt_clean_days), `${cleanDaysIn28()}/${PERSON.durationDays}`]
+  ];
+
+  // 28-day adherence grid
+  let calHtml = `<p>${t(UI.rpt_no_start)}</p>`;
+  if (state.startDate) {
+    const start = new Date(state.startDate);
+    const todayIso = today();
+    const cells = [];
+    for (let i = 0; i < PERSON.durationDays; i++) {
+      const d = new Date(start); d.setDate(d.getDate() + i);
+      const iso = d.toISOString().slice(0,10);
+      const dd = state.days[iso];
+      let score = 0;
+      if (dd) score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
+      const future = iso > todayIso;
+      const cheatN = (state.cheats[iso] || []).length;
+      let bg = "#f3f3f3";
+      if (!future && dd) {
+        if (score >= 6) bg = "#16a34a";
+        else if (score >= 4) bg = "#86efac";
+        else if (score >= 2) bg = "#fde68a";
+        else if (score >= 1) bg = "#fef3c7";
+      }
+      const fg = (score >= 5 && !future) ? "#fff" : "#111";
+      const dot = cheatN ? `<span class="rpt-cell-dot"></span>` : "";
+      cells.push(`<div class="rpt-cell" style="background:${future ? "#fff" : bg};color:${fg};${future ? "border:1px dashed #ccc;color:#bbb;" : ""}">
+        <span>${i+1}</span>${dot}
+      </div>`);
+    }
+    calHtml = `<div class="rpt-cal">${cells.join("")}</div>`;
+  }
+
+  // Cheats list
+  let cheatsHtml = `<p class="rpt-clean">${t(UI.rpt_no_cheats)}</p>`;
+  if (cheatDates.length) {
+    cheatsHtml = cheatDates.slice().reverse().map(d => `
+      <div class="rpt-cheat-day">
+        <h4>${formatDate(d)}</h4>
+        <ul>
+          ${state.cheats[d].slice().reverse().map(c => {
+            const tag = c.kind === "excess" ? t(UI.rpt_excess_label) : t(UI.rpt_banned_label);
+            const tagCls = c.kind === "banned" ? "rpt-tag banned" : "rpt-tag excess";
+            return `<li>
+              <span class="${tagCls}">${tag}</span>
+              <strong>${escapeHtml(c.name || "—")}</strong>${c.qty ? ` — ${escapeHtml(c.qty)}` : ""}
+              ${c.note ? `<div class="rpt-cheat-note">${escapeHtml(c.note)}</div>` : ""}
+            </li>`;
+          }).join("")}
+        </ul>
+      </div>
+    `).join("");
+  }
+
+  const dayN = dayNumber();
+  const breakdown = tUI("rpt_cheats_breakdown", { total: totalCheat, excess: excessCount, banned: bannedCount });
+
+  host.innerHTML = `
+    <header class="rpt-head">
+      <h1>${t(UI.rpt_title)} — ${PERSON.name}</h1>
+      <div class="rpt-meta">
+        <span><strong>${t(UI.rpt_printed)}:</strong> ${formatDate(today())}</span>
+        ${state.startDate ? `<span><strong>${t(UI.rpt_start)}:</strong> ${formatDate(state.startDate)}</span>` : ""}
+        ${dayN ? `<span><strong>${t(UI.rpt_day)}:</strong> ${dayN}/${PERSON.durationDays}</span>` : ""}
+      </div>
+    </header>
+
+    <section class="rpt-section">
+      <h2>${t(UI.rpt_summary)}</h2>
+      <div class="rpt-summary-grid">
+        ${summary.map(([l,v]) => `<div class="rpt-stat"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("")}
+      </div>
+    </section>
+
+    <section class="rpt-section">
+      <h2>${t(UI.rpt_weight_section)}</h2>
+      ${ws.length ? `
+        <div class="rpt-chart-wrap"><canvas id="rptWeightChart"></canvas></div>
+        <table class="rpt-table">
+          <thead><tr>
+            <th>${t(UI.rpt_col_date)}</th>
+            <th>${t(UI.rpt_col_weight)}</th>
+            <th>${t(UI.rpt_col_delta)}</th>
+          </tr></thead>
+          <tbody>
+            ${ws.map(w => {
+              const delta = w.kg - first.kg;
+              const sign = delta > 0 ? "+" : "";
+              return `<tr><td>${w.date}</td><td>${w.kg.toFixed(1)}</td><td>${sign}${delta.toFixed(1)}</td></tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      ` : `<p>${t(UI.rpt_weight_none)}</p>`}
+    </section>
+
+    <section class="rpt-section rpt-page-break">
+      <h2>${t(UI.rpt_adherence)}</h2>
+      ${calHtml}
+      <p class="rpt-legend">${t(UI.rpt_legend)}</p>
+    </section>
+
+    <section class="rpt-section">
+      <h2>${t(UI.rpt_cheats_section)}</h2>
+      <p class="rpt-breakdown">${breakdown}</p>
+      ${cheatsHtml}
+    </section>
+
+    <footer class="rpt-foot">${t(UI.rpt_footer)} · ${formatDate(today())}</footer>
+  `;
+
+  // Render weight chart inside the report
+  if (ws.length && window.Chart) {
+    const ctx = document.getElementById("rptWeightChart");
+    if (ctx) {
+      if (rptChart) { rptChart.destroy(); rptChart = null; }
+      rptChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: ws.map(w => w.date.slice(5)),
+          datasets: [
+            { label: t(UI.chart_weight), data: ws.map(w => w.kg), borderColor: "#111", backgroundColor: "rgba(0,0,0,.06)", tension:.3, fill:true, pointRadius:3, pointBackgroundColor:"#111" },
+            { label: t(UI.chart_goal), data: ws.map(() => PERSON.ibw), borderColor:"#666", borderDash:[4,4], fill:false, pointRadius:0 }
+          ]
+        },
+        options: { responsive:true, animation:false, plugins:{ legend:{ position:"bottom" } } }
+      });
+    }
+  }
+}
+
+function doPrint() {
+  renderPrintReport();
+  // Wait two frames so Chart.js paints, then print.
+  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+}
+
 // ---------- Render all ----------
 function renderAll() {
   renderToday();
@@ -870,6 +1327,8 @@ function renderAll() {
   renderPersonInfo();
   renderStartDateDisplay();
   renderInsights();
+  setupCheatForm();
+  renderCheatsTab();
 }
 
 // ---------- INIT ----------
