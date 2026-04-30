@@ -466,7 +466,7 @@ const UI = {
   start_date_saved_label: { ar:"التاريخ المحفوظ:", en:"Saved date:" },
   start_date_none: { ar:"لم يُحفظ بعد", en:"Not saved yet" },
   start_date_active_label: { ar:"النظام نشط منذ", en:"Plan active since" },
-  start_date_locked_hint: { ar:"لا يمكن تغيير تاريخ البدء بعد حفظه. لإعادة تشغيل النظام، استخدمي زر \"مسح جميع البيانات\" في الأسفل.", en:"The start date cannot be changed once saved. To restart the plan, use the \"Reset all data\" button below." },
+  start_date_locked_hint: { ar:"يمكن تعديل تاريخ البدء عند الحاجة — البيانات المسجلة لا تتأثر.", en:"You can edit the start date if needed — logged data is not affected." },
   btn_save: { ar:"حفظ", en:"Save" },
   start_saved: { ar:"تم حفظ تاريخ البدء ✅", en:"Start date saved ✅" },
   choose_date: { ar:"اختاري تاريخ", en:"Choose a date" },
@@ -607,5 +607,17 @@ const UI = {
   rpt_no_cheats: { ar:"لا يوجد غش مسجل — أداء ممتاز ✓", en:"No cheats logged — clean record ✓" },
   rpt_excess_label: { ar:"زيادة", en:"EXCESS" },
   rpt_banned_label: { ar:"ممنوع", en:"BANNED" },
-  rpt_footer: { ar:"تقرير خاص — Lynn Hamad Keto", en:"Private report — Lynn Hamad Keto" }
+  rpt_footer: { ar:"تقرير خاص — Lynn Hamad Keto", en:"Private report — Lynn Hamad Keto" },
+  rpt_daily_section: { ar:"السجل اليومي", en:"Daily log" },
+  rpt_no_daily: { ar:"لا توجد أيام مسجلة بعد.", en:"No days logged yet." },
+  rpt_col_water: { ar:"الماء", en:"Water" },
+  rpt_col_meals: { ar:"الوجبات", en:"Meals" },
+  rpt_col_cheats: { ar:"الغش", en:"Cheats" },
+
+  // Editable person info
+  btn_save_person: { ar:"💾 حفظ المعلومات", en:"💾 Save info" },
+  person_saved: { ar:"تم حفظ المعلومات ✅", en:"Info saved ✅" },
+  person_bmi_auto: { ar:"يُحتسب تلقائياً", en:"auto-calculated" },
+  btn_edit_start: { ar:"✏️ تعديل", en:"✏️ Edit" },
+  start_date_locked_hint_v2: { ar:"يمكن تعديل تاريخ البدء عند الحاجة — البيانات المسجلة لا تتأثر.", en:"You can edit the start date if needed — logged data is not affected." }
 };

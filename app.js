@@ -39,10 +39,26 @@ function defaultState() {
     favorites: [],
     shopping: {},
     photos: [],
-    cheats: {}
+    cheats: {},
+    person: {}
   };
 }
 let state = loadState();
+
+// Apply user overrides to PERSON (mutates the object — const forbids
+// rebinding, not mutation). Re-derive BMI from weight/height unless
+// the override explicitly sets one.
+function applyPersonOverrides() {
+  const o = state.person || {};
+  Object.keys(o).forEach(k => {
+    if (o[k] !== undefined && o[k] !== null && o[k] !== "") PERSON[k] = o[k];
+  });
+  if (PERSON.weight && PERSON.height && !("bmi" in o)) {
+    const m = PERSON.height / 100;
+    PERSON.bmi = +(PERSON.weight / (m * m)).toFixed(2);
+  }
+}
+applyPersonOverrides();
 
 // ---------- Date helpers ----------
 function today() {
@@ -822,19 +838,83 @@ function renderStartDateDisplay() {
     locked.style.display = "none";
   }
 }
+// Re-open the date picker when the user wants to correct the start date.
+function bindStartDateEdit() {
+  const btn = document.getElementById("editStartDateBtn");
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+  btn.addEventListener("click", () => {
+    const setter = document.getElementById("startDateSetter");
+    const locked = document.getElementById("startDateLocked");
+    const input = document.getElementById("startDateInput");
+    if (input && state.startDate) input.value = state.startDate;
+    setter.style.display = "";
+    locked.style.display = "none";
+  });
+}
 function renderPersonInfo() {
   const c = document.getElementById("personInfo");
-  const items = [
-    [t(UI.info_name), PERSON.name],
-    [t(UI.info_weight), PERSON.weight + " " + t(UI.kg)],
-    [t(UI.info_height), PERSON.height + " " + t(UI.cm)],
-    [t(UI.info_age), PERSON.age + " " + t(UI.years)],
-    [t(UI.info_bmi), PERSON.bmi],
-    [t(UI.info_ibw), PERSON.ibw + " " + t(UI.kg)],
-    [t(UI.info_water), PERSON.waterCupsPerDay + " " + t(UI.cups_day)],
-    [t(UI.info_duration), PERSON.durationDays + " " + t(UI.days)]
+  const fields = [
+    { key:"name",             uiKey:"info_name",     type:"text"   },
+    { key:"weight",           uiKey:"info_weight",   type:"number", step:"0.1", unit:"kg" },
+    { key:"height",           uiKey:"info_height",   type:"number", step:"0.1", unit:"cm" },
+    { key:"age",              uiKey:"info_age",      type:"number", step:"1",   unit:"years" },
+    { key:"ibw",              uiKey:"info_ibw",      type:"number", step:"0.1", unit:"kg" },
+    { key:"waterCupsPerDay",  uiKey:"info_water",    type:"number", step:"1",   unit:"cups_day" },
+    { key:"durationDays",     uiKey:"info_duration", type:"number", step:"1",   unit:"days" }
   ];
-  c.innerHTML = items.map(([l,v]) => `<div class="info-item"><span>${l}</span><strong>${v}</strong></div>`).join("");
+  c.innerHTML = `
+    <div class="person-form">
+      ${fields.map(f => `
+        <div class="person-field">
+          <label for="pf-${f.key}">${t(UI[f.uiKey])}</label>
+          <div class="person-input-wrap">
+            <input type="${f.type}" id="pf-${f.key}" data-pkey="${f.key}" value="${PERSON[f.key] ?? ""}"${f.step ? ` step="${f.step}"` : ""} />
+            ${f.unit ? `<span class="person-unit">${t(UI[f.unit])}</span>` : ""}
+          </div>
+        </div>
+      `).join("")}
+      <div class="person-bmi">
+        <span>${t(UI.info_bmi)}</span>
+        <strong id="pf-bmi-display">${PERSON.bmi ?? "—"}</strong>
+        <span class="text-muted">(${t(UI.person_bmi_auto)})</span>
+      </div>
+      <button class="btn btn-primary" id="savePersonBtn">${t(UI.btn_save_person)}</button>
+    </div>
+  `;
+  const recalcBmi = () => {
+    const w = parseFloat(document.getElementById("pf-weight").value);
+    const h = parseFloat(document.getElementById("pf-height").value);
+    const out = document.getElementById("pf-bmi-display");
+    if (w > 0 && h > 0) out.textContent = (w / Math.pow(h/100, 2)).toFixed(2);
+    else out.textContent = "—";
+  };
+  document.getElementById("pf-weight").addEventListener("input", recalcBmi);
+  document.getElementById("pf-height").addEventListener("input", recalcBmi);
+
+  document.getElementById("savePersonBtn").addEventListener("click", () => {
+    const overrides = {};
+    c.querySelectorAll("[data-pkey]").forEach(inp => {
+      const k = inp.dataset.pkey;
+      let v = inp.value.trim();
+      if (v === "") return;
+      if (inp.type === "number") {
+        const n = parseFloat(v);
+        if (Number.isNaN(n)) return;
+        v = n;
+      }
+      overrides[k] = v;
+    });
+    if (overrides.weight && overrides.height) {
+      const m = overrides.height / 100;
+      overrides.bmi = +(overrides.weight / (m * m)).toFixed(2);
+    }
+    state.person = overrides;
+    Object.assign(PERSON, overrides);
+    saveState();
+    renderAll();
+    toast(t(UI.person_saved));
+  });
 }
 document.getElementById("exportData").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -1180,6 +1260,29 @@ function renderPrintReport() {
     [t(UI.rpt_clean_days), `${cleanDaysIn28()}/${PERSON.durationDays}`]
   ];
 
+  // Per-day breakdown (only days with any data)
+  const loggedDays = Object.keys(state.days).sort();
+  let dailyTableHtml = `<p>${t(UI.rpt_no_daily)}</p>`;
+  if (loggedDays.length) {
+    dailyTableHtml = `
+      <table class="rpt-table">
+        <thead><tr>
+          <th>${t(UI.rpt_col_date)}</th>
+          <th>${t(UI.rpt_col_water)}</th>
+          <th>${t(UI.rpt_col_meals)}</th>
+          <th>${t(UI.rpt_col_cheats)}</th>
+        </tr></thead>
+        <tbody>
+          ${loggedDays.map(d => {
+            const dd = state.days[d];
+            const m = Object.values(dd.meals).filter(Boolean).length;
+            const cn = (state.cheats[d] || []).length;
+            return `<tr><td>${d}</td><td>${dd.water || 0}/${PERSON.waterCupsPerDay}</td><td>${m}/5</td><td>${cn}</td></tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
+  }
+
   // 28-day adherence grid
   let calHtml = `<p>${t(UI.rpt_no_start)}</p>`;
   if (state.startDate) {
@@ -1194,6 +1297,7 @@ function renderPrintReport() {
       if (dd) score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
       const future = iso > todayIso;
       const cheatN = (state.cheats[iso] || []).length;
+      const water = (dd && !future) ? (dd.water || 0) : null;
       let bg = "#f3f3f3";
       if (!future && dd) {
         if (score >= 6) bg = "#16a34a";
@@ -1203,8 +1307,9 @@ function renderPrintReport() {
       }
       const fg = (score >= 5 && !future) ? "#fff" : "#111";
       const dot = cheatN ? `<span class="rpt-cell-dot"></span>` : "";
+      const waterStr = water !== null ? `<span class="rpt-cell-water">💧${water}/${PERSON.waterCupsPerDay}</span>` : "";
       cells.push(`<div class="rpt-cell" style="background:${future ? "#fff" : bg};color:${fg};${future ? "border:1px dashed #ccc;color:#bbb;" : ""}">
-        <span>${i+1}</span>${dot}
+        <span class="rpt-cell-num">${i+1}</span>${waterStr}${dot}
       </div>`);
     }
     calHtml = `<div class="rpt-cal">${cells.join("")}</div>`;
@@ -1279,6 +1384,11 @@ function renderPrintReport() {
     </div>
 
     <div class="rpt-section">
+      <h2>${t(UI.rpt_daily_section)}</h2>
+      ${dailyTableHtml}
+    </div>
+
+    <div class="rpt-section">
       <h2>${t(UI.rpt_cheats_section)}</h2>
       <p class="rpt-breakdown">${breakdown}</p>
       ${cheatsHtml}
@@ -1339,6 +1449,7 @@ function renderAll() {
   renderPhotos();
   renderPersonInfo();
   renderStartDateDisplay();
+  bindStartDateEdit();
   renderInsights();
   setupCheatForm();
   renderCheatsTab();
