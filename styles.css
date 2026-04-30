@@ -1409,9 +1409,21 @@ table th {
 
   /* Report header */
   .rpt-head {
-    border-bottom: 2pt solid #111;
-    padding-bottom: 6pt;
-    margin-bottom: 14pt;
+    background: white !important;
+    color: #111 !important;
+    border: 0 !important;
+    border-bottom: 2pt solid #111 !important;
+    border-radius: 0 !important;
+    padding: 0 0 6pt !important;
+    margin: 0 0 14pt !important;
+    text-align: start !important;
+  }
+  .rpt-head h1 {
+    background: none !important;
+    color: #111 !important;
+    font-size: 18pt !important;
+    margin: 0 0 4pt !important;
+    padding: 0 !important;
   }
   .rpt-head h1 {
     margin: 0 0 4pt;

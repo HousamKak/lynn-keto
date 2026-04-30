@@ -1235,14 +1235,14 @@ function renderPrintReport() {
   const breakdown = tUI("rpt_cheats_breakdown", { total: totalCheat, excess: excessCount, banned: bannedCount });
 
   host.innerHTML = `
-    <header class="rpt-head">
+    <div class="rpt-head">
       <h1>${t(UI.rpt_title)} — ${PERSON.name}</h1>
       <div class="rpt-meta">
         <span><strong>${t(UI.rpt_printed)}:</strong> ${formatDate(today())}</span>
         ${state.startDate ? `<span><strong>${t(UI.rpt_start)}:</strong> ${formatDate(state.startDate)}</span>` : ""}
         ${dayN ? `<span><strong>${t(UI.rpt_day)}:</strong> ${dayN}/${PERSON.durationDays}</span>` : ""}
       </div>
-    </header>
+    </div>
 
     <section class="rpt-section">
       <h2>${t(UI.rpt_summary)}</h2>
@@ -1308,9 +1308,22 @@ function renderPrintReport() {
 }
 
 function doPrint() {
+  const rpt = document.getElementById("printReport");
+  if (!rpt) return;
+
+  // Position off-screen but with real layout so Chart.js can size the canvas.
+  // (Without this, #printReport is display:none on screen and the chart
+  // initializes with zero dimensions, which breaks the whole report layout.)
+  const prev = rpt.style.cssText;
+  rpt.style.cssText = "display:block;position:fixed;left:-99999px;top:0;width:186mm;background:white;z-index:-1;";
+
   renderPrintReport();
-  // Wait two frames so Chart.js paints, then print.
-  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+
+  // Give Chart.js two frames + a short tick to paint, then print and restore.
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { rpt.style.cssText = prev; }, 600);
+  }, 120);
 }
 
 // ---------- Render all ----------

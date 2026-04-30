@@ -1,6 +1,6 @@
 // Network-first: always fetch latest from the network (bypassing HTTP cache),
 // fall back to cache when offline.
-const CACHE = "lynn-keto-v10";
+const CACHE = "lynn-keto-v11";
 const ASSETS = ["./", "index.html", "styles.css", "data.js", "icons.js", "gate.js", "app.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", (e) => {
