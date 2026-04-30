@@ -922,8 +922,8 @@ function escapeHtml(s) {
 }
 
 function mealOptionLabel(m) {
-  const title = m.title ? ` — ${t(m.title)}` : "";
-  return `${t(UI.option_label)} ${t(m.num)}${title}`;
+  if (m.title) return t(m.title);
+  return m.items.map(x => t(x)).join(" · ");
 }
 
 const CHEAT_EXCESS_CATEGORIES = [
