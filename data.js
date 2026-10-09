@@ -1,623 +1,508 @@
 // ============================================================
-// LYNN KETO — Bilingual data (ar / en)
+// LYNN PLAN: diet & workout plan data (ar / en)
+// Source: "My Diet & Workout Plan" (PCOS + insulin resistance)
 // ============================================================
 
-const PERSON = {
-  name: "LYNN HAMAD",
-  weight: 63,
+const PROFILE = {
+  name: "Lynn Hamad",
+  age: 22,
   height: 163,
-  age: 21,
-  gender: { ar: "أنثى", en: "Female" },
-  bmi: 23.71,
-  ibw: 55.41,
-  waterCupsPerDay: 8,
-  durationDays: 28
+  startWeight: 62.5,
+  condition: { ar: "تكيّس المبايض + مقاومة الإنسولين", en: "PCOS + insulin resistance" },
+  medication: { ar: "ميتفورمين 500 ملغ", en: "Metformin 500 mg" }
 };
 
-// Reusable fragments
-const NUTS = { ar: "6 لوز / 12 فستق حلبي / 10 فول سوداني / 6 بندق", en: "6 almonds / 12 pistachios / 10 peanuts / 6 hazelnuts" };
-const OLIVES_10_8 = { ar: "10 زيتون أخضر / 8 زيتون أسود", en: "10 green olives / 8 black olives" };
-const OLIVES_10_6 = { ar: "10 زيتون أخضر / 6 زيتون أسود", en: "10 green olives / 6 black olives" };
-const SALAD_2TSP  = { ar: "+ كوب سلطة مع 2 ملعقة صغيرة زيت", en: "+ 1 cup salad with 2 tsp oil" };
-const SALAD_3TSP  = { ar: "+ كوب سلطة مع 3 ملعقة صغيرة زيت", en: "+ 1 cup salad with 3 tsp oil" };
+const GOAL = {
+  ar: "خسارة دهون الجسم، بناء العضل، وتحسين حساسية الإنسولين.",
+  en: "Lose body fat, build muscle, improve insulin sensitivity."
+};
 
-const VEGETABLES = [
-  { ar:"السبانخ", en:"Spinach" },{ ar:"الهليون", en:"Asparagus" },
-  { ar:"الباذنجان", en:"Eggplant" },{ ar:"البندورة", en:"Tomato" },
-  { ar:"الفطر", en:"Mushroom" },{ ar:"الخس", en:"Lettuce" },
-  { ar:"الزهرة (القرنبيط)", en:"Cauliflower" },{ ar:"الخيار", en:"Cucumber" },
-  { ar:"الكايل", en:"Kale" },{ ar:"الكرفس", en:"Celery" },
-  { ar:"البصل الأخضر", en:"Green onion" },{ ar:"الكوسى", en:"Zucchini" },
-  { ar:"الملفوف", en:"Cabbage" },{ ar:"البروكلي", en:"Broccoli" },
-  { ar:"النعناع", en:"Mint" },{ ar:"الزنجبيل", en:"Ginger" },
-  { ar:"الفلفل الأخضر", en:"Green pepper" },{ ar:"الزعتر (ملعقة طعام)", en:"Thyme (1 tbsp)" }
+// Daily targets. `aim` is the value the plan picked inside the range.
+const TARGETS = {
+  kcal:    { min: 1850, max: 1950, aim: 1950, unit: "kcal" },
+  protein: { min: 110,  max: 125,  aim: 125,  unit: "g" },
+  carbs:   { min: 170,  max: 200,  aim: 200,  unit: "g" },
+  fat:     { min: 65,   max: 80,   aim: 80,   unit: "g" },
+  fiber:   { min: 30,   max: 35,   aim: 35,   unit: "g" },
+  waterMl: { min: 2000, max: 2500, aim: 2500, unit: "ml" },
+  vegG:    { min: 300,  max: 400,  aim: 400,  unit: "g" },
+  fruit:   { min: 2,    max: 2,    aim: 2,    unit: "" },
+  sleep:   { min: 7,    max: 9,    aim: 8,    unit: "h" }
+};
+
+const GLASS_ML = 250;
+const GLASSES = 10; // 10 x 250 ml = 2.5 L
+
+const SLOTS = [
+  { key: "breakfast", icon: "sunrise", name: { ar: "الفطور", en: "Breakfast" }, kcal: [350, 400] },
+  { key: "snack1",    icon: "apple",   name: { ar: "سناك 1", en: "Snack 1" },   kcal: [150, 200] },
+  { key: "lunch",     icon: "bowl",    name: { ar: "الغداء", en: "Lunch" },     kcal: [500, 550] },
+  { key: "snack2",    icon: "cookie",  name: { ar: "سناك 2", en: "Snack 2" },   kcal: [150, 200] },
+  { key: "dinner",    icon: "moon",    name: { ar: "العشاء", en: "Dinner" },    kcal: [450, 550] }
 ];
 
-const SAUCES = [
-  { name:{ar:"المايونيز",en:"Mayonnaise"}, qty:{ar:"حسب الكميات المذكورة لاحقاً",en:"As specified below"} },
-  { name:{ar:"الصويا صوص (Kikoman)",en:"Soy sauce (Kikoman)"}, qty:{ar:"ملعقتا طعام فقط",en:"2 tbsp only"} },
-  { name:{ar:"RANCH رانش",en:"Ranch"}, qty:{ar:"ملعقتا طعام فقط",en:"2 tbsp only"} },
-  { name:{ar:"الحامض (الليمون)",en:"Lemon juice"}, qty:{ar:"ملعقتا طعام فقط",en:"2 tbsp only"} },
-  { name:{ar:"الخردل",en:"Mustard"}, qty:{ar:"ملعقتا طعام فقط",en:"2 tbsp only"} },
-  { name:{ar:"الخل الأبيض",en:"White vinegar"}, qty:{ar:"حسب الحاجة",en:"As needed"} },
-  { name:{ar:"الخل البلسميك",en:"Balsamic vinegar"}, qty:{ar:"ملعقة طعام فقط",en:"1 tbsp only"} },
-  { name:{ar:"الصلصة",en:"Tomato sauce"}, qty:{ar:"1/4 كوب",en:"1/4 cup"} }
+// ------------------------------------------------------------
+// Foods. Nutrition is an ESTIMATE from typical label values,
+// per 100 g / 100 ml (unit g/ml) or per piece (unit pc).
+// Lynn can override labneh, cottage cheese, protein powder,
+// milk and bread with her own labels in Settings.
+// fruitG: grams that count as one fruit serving.
+// ------------------------------------------------------------
+const FOODS = {
+  cottage:  { name:{ar:"جبنة كوتيج قليلة الدسم",en:"low-fat cottage cheese"}, unit:"g",  kcal:72,  p:12.4, c:2.7,  f:1.0,  fib:0,    group:"protein", label:true },
+  labneh:   { name:{ar:"لبنة قليلة الدسم",en:"low-fat labneh"},           unit:"g",  kcal:110, p:8,    c:4.5,  f:6.5,  fib:0,    group:"protein", label:true },
+  powder:   { name:{ar:"بروتين بودرة",en:"protein powder"},               unit:"g",  kcal:380, p:78,   c:8,    f:5,    fib:0,    group:"protein", label:true },
+  milk:     { name:{ar:"حليب",en:"milk"},                                 unit:"ml", kcal:47,  p:3.4,  c:4.9,  f:1.5,  fib:0,    group:"protein", label:true },
+  fish:     { name:{ar:"سمك أبيض مطبوخ",en:"cooked white fish"},          unit:"g",  kcal:105, p:23,   c:0,    f:0.9,  fib:0,    group:"protein" },
+  lentils:  { name:{ar:"عدس مطبوخ",en:"cooked lentils"},                  unit:"g",  kcal:116, p:9,    c:20,   f:0.4,  fib:7.9,  group:"carb" },
+
+  bread:    { name:{ar:"خبز قمح كامل",en:"whole-wheat bread"},            unit:"g",  kcal:250, p:12.5, c:42,   f:3.5,  fib:6,    group:"carb", label:true },
+  potato:   { name:{ar:"بطاطا مسلوقة",en:"boiled potatoes"},              unit:"g",  kcal:87,  p:1.9,  c:20,   f:0.1,  fib:1.8,  group:"carb" },
+  rice:     { name:{ar:"رز مطبوخ",en:"cooked rice"},                      unit:"g",  kcal:130, p:2.7,  c:28,   f:0.3,  fib:0.4,  group:"carb" },
+  pasta:    { name:{ar:"معكرونة مطبوخة",en:"cooked pasta"},               unit:"g",  kcal:158, p:5.8,  c:31,   f:0.9,  fib:1.8,  group:"carb" },
+  oats:     { name:{ar:"شوفان (ناشف)",en:"oats, dry"},                    unit:"g",  kcal:389, p:16.9, c:66,   f:6.9,  fib:10.6, group:"carb" },
+
+  oil:      { name:{ar:"زيت زيتون",en:"olive oil"},                       unit:"g",  kcal:884, p:0,    c:0,    f:100,  fib:0,    group:"fat" },
+  almonds:  { name:{ar:"لوز",en:"almonds"},                               unit:"g",  kcal:579, p:21,   c:22,   f:50,   fib:12.5, group:"fat" },
+  walnuts:  { name:{ar:"جوز",en:"walnuts"},                               unit:"g",  kcal:654, p:15.2, c:13.7, f:65.2, fib:6.7,  group:"fat" },
+  pb:       { name:{ar:"زبدة فول سوداني",en:"peanut butter"},             unit:"g",  kcal:588, p:25,   c:20,   f:50,   fib:6,    group:"fat" },
+  avocado:  { name:{ar:"أفوكادو",en:"avocado"},                           unit:"g",  kcal:160, p:2,    c:8.5,  f:14.7, fib:6.7,  group:"fat" },
+
+  apple:    { name:{ar:"تفاحة",en:"apple"},                               unit:"pc", kcal:95,  p:0.5,  c:25,   f:0.3,  fib:4.4,  group:"fruit", fruitPc:1 },
+  pear:     { name:{ar:"إجاصة",en:"pear"},                                unit:"pc", kcal:101, p:0.6,  c:27,   f:0.2,  fib:5.5,  group:"fruit", fruitPc:1 },
+  banana:   { name:{ar:"موزة",en:"banana"},                               unit:"pc", kcal:105, p:1.3,  c:27,   f:0.4,  fib:3.1,  group:"fruit", fruitPc:1 },
+  bananaS:  { name:{ar:"موزة صغيرة",en:"small banana"},                   unit:"pc", kcal:90,  p:1.1,  c:23,   f:0.3,  fib:2.6,  group:"fruit", fruitPc:1 },
+  orange:   { name:{ar:"برتقالة",en:"orange"},                            unit:"pc", kcal:62,  p:1.2,  c:15.4, f:0.2,  fib:3.1,  group:"fruit", fruitPc:1 },
+  peach:    { name:{ar:"درّاقة",en:"peach"},                              unit:"pc", kcal:59,  p:1.4,  c:14,   f:0.4,  fib:2.3,  group:"fruit", fruitPc:1 },
+  kiwi:     { name:{ar:"كيوي",en:"kiwi"},                                 unit:"pc", kcal:42,  p:0.8,  c:10,   f:0.4,  fib:2.1,  group:"fruit", fruitPc:0.5 },
+  berries:  { name:{ar:"توت",en:"berries"},                               unit:"g",  kcal:57,  p:0.7,  c:14.5, f:0.3,  fib:2.4,  group:"fruit", fruitG:100 },
+  strawb:   { name:{ar:"فراولة",en:"strawberries"},                       unit:"g",  kcal:32,  p:0.7,  c:7.7,  f:0.3,  fib:2,    group:"fruit", fruitG:150 },
+  blueb:    { name:{ar:"توت أزرق",en:"blueberries"},                      unit:"g",  kcal:57,  p:0.7,  c:14.5, f:0.3,  fib:2.4,  group:"fruit", fruitG:100 },
+  grapes:   { name:{ar:"عنب",en:"grapes"},                                unit:"g",  kcal:69,  p:0.7,  c:18,   f:0.2,  fib:0.9,  group:"fruit", fruitG:100 },
+  melon:    { name:{ar:"بطيخ",en:"watermelon"},                           unit:"g",  kcal:30,  p:0.6,  c:7.6,  f:0.2,  fib:0.4,  group:"fruit", fruitG:200 },
+
+  veg:      { name:{ar:"خضار",en:"vegetables"},                           unit:"g",  kcal:25,  p:1.5,  c:5,    f:0.2,  fib:2.2,  group:"veg" },
+  salad:    { name:{ar:"سلطة",en:"salad"},                                unit:"g",  kcal:18,  p:1.2,  c:3.3,  f:0.2,  fib:1.6,  group:"veg" },
+  cuctom:   { name:{ar:"خيار / بندورة",en:"cucumber/tomato"},             unit:"g",  kcal:16,  p:0.8,  c:3.4,  f:0.2,  fib:1,    group:"veg" },
+  cucumber: { name:{ar:"خيار",en:"cucumber"},                             unit:"g",  kcal:15,  p:0.7,  c:3.6,  f:0.1,  fib:0.5,  group:"veg" }
+};
+
+// q = amount (g / ml / pieces). noQty = show name only (plan gave no amount;
+// 100 g is assumed for the estimate).
+const I = (f, q, extra) => Object.assign({ f, q }, extra || {});
+
+const LUNCH_STD = [I("fish",150), I("potato",200), I("veg",200), I("oil",15)];
+const DINNER_180 = [I("lentils",180), I("cottage",150), I("bread",40), I("salad",200), I("oil",10)];
+const DINNER_200 = [I("lentils",200), I("cottage",150), I("bread",40), I("salad",200), I("oil",10)];
+const SMOOTHIE = { ar: "سموذي الفطور", en: "Breakfast smoothie" };
+
+// Index 0 = Monday ... 6 = Sunday
+const PLAN = [
+  { day:{ar:"الاثنين",en:"Monday"}, meals:{
+    breakfast:{ items:[I("cottage",150), I("bread",50), I("cuctom",150), I("walnuts",10)] },
+    snack1:   { items:[I("apple",1), I("pb",15)] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("powder",25), I("milk",200)] },
+    dinner:   { items:[I("lentils",180), I("cottage",120), I("bread",40), I("salad",150), I("oil",10)] }
+  }},
+  { day:{ar:"الثلاثاء",en:"Tuesday"}, meals:{
+    breakfast:{ items:[I("labneh",100), I("bread",60), I("veg",150), I("walnuts",10), I("milk",200)] },
+    snack1:   { items:[I("pear",1), I("almonds",15)] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("powder",25), I("berries",100)] },
+    dinner:   { items:DINNER_200 }
+  }},
+  { day:{ar:"الأربعاء",en:"Wednesday"}, meals:{
+    breakfast:{ title:SMOOTHIE, items:[I("milk",250), I("powder",30), I("bananaS",1), I("pb",15)] },
+    snack1:   { items:[I("bread",50), I("labneh",80), I("cucumber",100,{noQty:true})] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("apple",1), I("walnuts",20)] },
+    dinner:   { items:DINNER_200 }
+  }},
+  { day:{ar:"الخميس",en:"Thursday"}, meals:{
+    breakfast:{ items:[I("cottage",150), I("bread",60), I("veg",150), I("oil",10)] },
+    snack1:   { items:[I("banana",1), I("pb",15)] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("powder",25), I("milk",200)] },
+    dinner:   { items:DINNER_180 }
+  }},
+  { day:{ar:"الجمعة",en:"Friday"}, meals:{
+    breakfast:{ items:[I("labneh",100), I("bread",60), I("veg",150), I("walnuts",10), I("milk",200)] },
+    snack1:   { items:[I("apple",1), I("almonds",15)] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("powder",25), I("bananaS",1)] },
+    dinner:   { items:DINNER_200 }
+  }},
+  { day:{ar:"السبت",en:"Saturday"}, meals:{
+    breakfast:{ title:SMOOTHIE, items:[I("milk",250), I("powder",30), I("banana",1), I("pb",15)] },
+    snack1:   { items:[I("bread",50), I("labneh",80), I("cucumber",100,{noQty:true})] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("pear",1), I("walnuts",20)] },
+    dinner:   { items:DINNER_200 }
+  }},
+  { day:{ar:"الأحد",en:"Sunday"}, meals:{
+    breakfast:{ items:[I("cottage",150), I("bread",60), I("veg",150), I("walnuts",15)] },
+    snack1:   { items:[I("banana",1), I("pb",10)] },
+    lunch:    { items:LUNCH_STD },
+    snack2:   { items:[I("powder",25), I("milk",200)] },
+    dinner:   { items:DINNER_200 }
+  }}
 ];
 
-const DRINKS = [
-  { ar:"المياه مع الحامض (ملعقة طعام) والسكر الاصطناعي", en:"Water with lemon (1 tbsp) + artificial sweetener" },
-  { ar:"الشاي الأخضر بالنعناع", en:"Green tea with mint" },
-  { ar:"اليانسون", en:"Anise" },
-  { ar:"الشاي / الشاي بالنعناع", en:"Tea / tea with mint" },
-  { ar:"البابونج", en:"Chamomile" },
-  { ar:"الزنجبيل", en:"Ginger tea" },
-  { ar:"القهوة", en:"Coffee" },
-  { ar:"كوب من حليب اللوز غير المحلى", en:"1 cup unsweetened almond milk" },
-  { ar:"كوب من حليب جوز الهند غير المحلى", en:"1 cup unsweetened coconut milk" },
-  { ar:"المياه الغازية", en:"Sparkling water" },
-  { ar:"المشروبات الغازية دايت (كوب)", en:"Diet soda (1 cup)" }
+const PORTION_RULES = {
+  ar: "السمك والبطاطا والعدس تُوزن مطبوخة. الخبز والمكسرات والبروتين بودرة تُوزن كما هي في العبوة. استعملي اللبنة وجبنة الكوتيج قليلة الدسم قدر الإمكان.",
+  en: "Fish, potatoes and lentils are weighed cooked. Bread, nuts and protein powder are weighed as packaged. Use low-fat labneh and cottage cheese where possible."
+};
+const PLAN_NOTE = {
+  ar: "هذا قالب وجبات وليس قائمة محسوبة سعرة بسعرة. افحصي ملصقات اللبنة وجبنة الكوتيج والبروتين بودرة. بعض الأيام قد تكون أقل من هدف السعرات أو البروتين، فعدّلي الكميات.",
+  en: "This is a meal template, not a verified calorie-by-calorie menu. Check the labels of labneh, cottage cheese and protein powder. Some days may fall below the calorie or protein targets, so adjust portions accordingly."
+};
+const EXTRA_NOTE = {
+  ar: "أضيفي حصة صغيرة إضافية عند الحاجة للوصول إلى سعرات اليوم.",
+  en: "Add a small extra portion when needed to reach daily calories."
+};
+const TARGETS_NOTE = {
+  ar: "هذه أهداف بداية. عدّليها حسب طاقتك، تعافيك من التمارين، وتقدّمك.",
+  en: "These are starting targets. Adjust based on energy, workout recovery and progress."
+};
+
+// ------------------------------------------------------------
+// Food substitutions. `range` is what the plan lists, `q` the
+// amount it picked (used for the estimate and for "add extra").
+// ------------------------------------------------------------
+const SWAPS = [
+  { key:"protein", icon:"fish", title:{ar:"البروتين",en:"Protein"},
+    sub:{ar:"كل حصة تعطي تقريباً 20-25 غ بروتين",en:"Each portion gives roughly 20-25 g protein"},
+    items:[
+      { f:"fish",    range:"100-120", q:120 },
+      { f:"cottage", range:"180-220", q:220 },
+      { f:"powder",  range:"25-30",   q:30 },
+      { f:"lentils", range:"250",     q:250 },
+      { f:"milk",    range:"600-700", q:700 }
+    ],
+    notes:[
+      {ar:"اللبنة والجبنة العادية تختلف كمية البروتين فيها. افحصي الملصق.",en:"Labneh and ordinary cheese contain variable protein. Check the label."},
+      {ar:"العدس والحليب فيهم نشويات كمان، فهم مش معادلين للسمك بالسعرات.",en:"Lentils and milk also provide carbohydrates, so they are not calorie-equivalent to fish."}
+    ]},
+  { key:"carb", icon:"wheat", title:{ar:"النشويات",en:"Carbohydrates"},
+    sub:{ar:"كل حصة تعطي تقريباً 25-30 غ نشويات",en:"Each gives approximately 25-30 g carbohydrates"},
+    items:[
+      { f:"bread",   range:"55-60",   q:60 },
+      { f:"potato",  range:"140-160", q:160 },
+      { f:"rice",    range:"95-110",  q:110 },
+      { f:"pasta",   range:"90-100",  q:100 },
+      { f:"oats",    range:"40-45",   q:45 },
+      { f:"lentils", range:"125-140", q:130 }
+    ]},
+  { key:"fat", icon:"droplet", title:{ar:"الدهون الصحية",en:"Healthy fats"},
+    sub:{ar:"كل حصة تقريباً 90-120 سعرة",en:"Approximately 90-120 kcal per serving"},
+    items:[
+      { f:"oil",     range:"10",    q:10 },
+      { f:"almonds", range:"18-20", q:20 },
+      { f:"walnuts", range:"15-17", q:16 },
+      { f:"pb",      range:"18-20", q:20 },
+      { f:"avocado", range:"65-75", q:75 }
+    ]},
+  { key:"fruit", icon:"apple", title:{ar:"الفاكهة",en:"Fruit"},
+    sub:{ar:"اختاري تقريباً حصتين باليوم",en:"Choose approximately two servings daily"},
+    items:[
+      { f:"apple",  q:1, medium:true },
+      { f:"banana", q:1, medium:true },
+      { f:"orange", q:1, medium:true },
+      { f:"pear",   q:1, medium:true },
+      { f:"strawb", range:"150", q:150 },
+      { f:"blueb",  range:"100", q:100 },
+      { f:"grapes", range:"100", q:100 },
+      { f:"kiwi",   q:2, medium:true },
+      { f:"melon",  range:"200", q:200 },
+      { f:"peach",  q:1, medium:true }
+    ]}
 ];
 
-// ---------- BREAKFAST (11) ----------
-const BREAKFAST = [
-  { id:"b1", num:{ar:"الأول",en:"First"}, items:[
-    {ar:"1 بيضة مسلوقة (بيض + ملح + قرفة)", en:"1 boiled egg (egg + salt + cinnamon)"},
-    OLIVES_10_8, NUTS
+const VEG_FREE = [
+  {ar:"خيار",en:"Cucumber"},{ar:"بندورة",en:"Tomato"},{ar:"خس",en:"Lettuce"},
+  {ar:"بروكلي",en:"Broccoli"},{ar:"كوسا",en:"Zucchini"},{ar:"جزر",en:"Carrots"},
+  {ar:"سبانخ",en:"Spinach"},{ar:"فليفلة",en:"Peppers"},{ar:"فطر",en:"Mushrooms"},
+  {ar:"ملفوف",en:"Cabbage"},{ar:"قرنبيط",en:"Cauliflower"}
+];
+const VEG_NOTE = {
+  ar: "الهدف 300-400 غ خضار على الأقل باليوم. اختاري بحرية من القائمة. احسبي الزيت والصلصات والجبنة المضافة لحالها.",
+  en: "Aim for at least 300-400 g daily. Choose freely from the list. Count added oil, dressings and cheese separately."
+};
+
+// ------------------------------------------------------------
+// Weekly grocery list
+// ------------------------------------------------------------
+const GROCERY = [
+  { key:"protein", title:{ar:"بروتين وألبان",en:"Protein & dairy"}, items:[
+    { id:"g-fish",    name:{ar:"سمك أبيض",en:"White fish"},          qty:{ar:"~1.2-1.4 كغ (نيء)",en:"~1.2-1.4 kg raw"} },
+    { id:"g-cottage", name:{ar:"جبنة كوتيج",en:"Cottage cheese"},     qty:{ar:"~1.8 كغ",en:"~1.8 kg"} },
+    { id:"g-labneh",  name:{ar:"لبنة",en:"Labneh"},                   qty:{ar:"~450 غ",en:"~450 g"} },
+    { id:"g-milk",    name:{ar:"حليب",en:"Milk"},                     qty:{ar:"~1.5 ل",en:"~1.5 L"} },
+    { id:"g-powder",  name:{ar:"بروتين بودرة",en:"Protein powder"},   qty:{ar:"~200 غ",en:"~200 g"} }
   ]},
-  { id:"b2", num:{ar:"الثاني",en:"Second"}, items:[
-    {ar:"1 بيضة مع سبانخ وفلفل حلو", en:"1 egg with spinach and bell pepper"},
-    {ar:"1 ملعقة صغيرة زيت / زبدة", en:"1 tsp oil / butter"},
-    NUTS
+  { key:"carb", title:{ar:"نشويات",en:"Carbohydrates"}, items:[
+    { id:"g-bread",   name:{ar:"خبز قمح كامل",en:"Whole-wheat bread"}, qty:{ar:"~650 غ",en:"~650 g"} },
+    { id:"g-lentils", name:{ar:"عدس ناشف",en:"Dry lentils"},           qty:{ar:"~550 غ",en:"~550 g"} },
+    { id:"g-potato",  name:{ar:"بطاطا",en:"Potatoes"},                 qty:{ar:"~1.6 كغ",en:"~1.6 kg"} }
   ]},
-  { id:"b3", num:{ar:"الثالث",en:"Third"}, items:[
-    {ar:"1 بيضة + 1 مكدوس", en:"1 egg + 1 makdous (pickled eggplant)"},
-    NUTS
+  { key:"fruit", title:{ar:"فاكهة",en:"Fruit"}, items:[
+    { id:"g-banana",  name:{ar:"موز",en:"Bananas"},  qty:{ar:"5",en:"5"} },
+    { id:"g-apple",   name:{ar:"تفاح",en:"Apples"},  qty:{ar:"4",en:"4"} },
+    { id:"g-pear",    name:{ar:"إجاص",en:"Pears"},   qty:{ar:"2",en:"2"} },
+    { id:"g-berries", name:{ar:"توت",en:"Berries"},  qty:{ar:"100 غ",en:"100 g"} }
   ]},
-  { id:"b4", num:{ar:"الرابع",en:"Fourth"}, items:[
-    {ar:"1 بيضة مع فطر", en:"1 egg with mushrooms"},
-    {ar:"1 ملعقة صغيرة زيت / زبدة", en:"1 tsp oil / butter"},
-    NUTS
+  { key:"veg", title:{ar:"خضار",en:"Vegetables"},
+    note:{ar:"اشتري تقريباً 3-3.5 كغ خضار مشكّلة.",en:"Buy approximately 3-3.5 kg mixed vegetables."}, items:[
+    { id:"g-cucumber", name:{ar:"خيار",en:"Cucumbers"} },
+    { id:"g-tomato",   name:{ar:"بندورة",en:"Tomatoes"} },
+    { id:"g-lettuce",  name:{ar:"خس",en:"Lettuce"} },
+    { id:"g-broccoli", name:{ar:"بروكلي",en:"Broccoli"} },
+    { id:"g-zucchini", name:{ar:"كوسا",en:"Zucchini"} },
+    { id:"g-carrot",   name:{ar:"جزر",en:"Carrots"} },
+    { id:"g-spinach",  name:{ar:"سبانخ",en:"Spinach"} },
+    { id:"g-pepper",   name:{ar:"فليفلة",en:"Bell peppers"} }
   ]},
-  { id:"b5", num:{ar:"الخامس",en:"Fifth"}, items:[
-    {ar:"2 شرائح حبش + 1 شريحة جبنة", en:"2 turkey slices + 1 cheese slice"},
-    OLIVES_10_6, NUTS
-  ]},
-  { id:"b6", num:{ar:"السادس",en:"Sixth"}, items:[
-    {ar:"2 شرائح مرتديلا ملفوفة بالخس + 1 ملعقة صغيرة مايونيز", en:"2 mortadella slices wrapped in lettuce + 1 tsp mayo"},
-    NUTS
-  ]},
-  { id:"b7", num:{ar:"السابع",en:"Seventh"}, items:[
-    {ar:"30 غرام حلومي + 1 ملعقة صغيرة زيت / زبدة", en:"30g halloumi + 1 tsp oil / butter"},
-    NUTS
-  ]},
-  { id:"b8", num:{ar:"الثامن",en:"Eighth"}, items:[
-    {ar:"2 شرائح حبش ملفوفة بالخس + 1 ملعقة صغيرة مايونيز", en:"2 turkey slices wrapped in lettuce + 1 tsp mayo"},
-    NUTS
-  ]},
-  { id:"b9", num:{ar:"التاسع",en:"Ninth"}, items:[
-    {ar:"2 شرائح مرتديلا + 1 شريحة جبنة (مع هاليبينوس وفلفل حلو)", en:"2 mortadella slices + 1 cheese slice (with jalapeño & bell pepper)"},
-    OLIVES_10_8, NUTS
-  ]},
-  { id:"b10", num:{ar:"العاشر",en:"Tenth"}, items:[
-    {ar:"1 بيضة + 1/3 أفوكادو", en:"1 egg + 1/3 avocado"}
-  ]},
-  { id:"b11", num:{ar:"الحادي عشر",en:"Eleventh"}, items:[
-    {ar:"2 ملعقة طعام لبنة", en:"2 tbsp labneh"},
-    OLIVES_10_8, NUTS
+  { key:"fat", title:{ar:"دهون وإضافات",en:"Fats & extras"}, items:[
+    { id:"g-oil",     name:{ar:"زيت زيتون",en:"Olive oil"},             qty:{ar:"~200 مل",en:"~200 ml"} },
+    { id:"g-walnuts", name:{ar:"جوز",en:"Walnuts"},                     qty:{ar:"~100 غ",en:"~100 g"} },
+    { id:"g-almonds", name:{ar:"لوز",en:"Almonds"},                     qty:{ar:"~30 غ",en:"~30 g"} },
+    { id:"g-pb",      name:{ar:"زبدة فول سوداني",en:"Peanut butter"},   qty:{ar:"~60 غ",en:"~60 g"} },
+    { id:"g-spices",  name:{ar:"حامض، ثوم، بهارات",en:"Lemon, garlic, spices"} }
   ]}
 ];
 
-// ---------- LUNCH (20) ----------
-const LUNCH = [
-  { id:"l1", num:{ar:"الأول",en:"First"}, title:{ar:"ستيك بالجبنة",en:"Cheesy steak"}, items:[
-    {ar:"90 غرام ستيك مشوي (ملح وبهار) على نار خفيفة", en:"90g grilled steak (salt & pepper) on low heat"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة (تُضاف عند الانتهاء)", en:"1 tsp oil/butter (added at end)"},
-    {ar:"2 شرائح جبنة تُترك حتى تذوب ثم ملح وفلفل أسود", en:"2 cheese slices until melted + salt & black pepper"},
-    {ar:"2 ملعقة صغيرة مايونيز", en:"2 tsp mayonnaise"},
-    SALAD_2TSP
+// ------------------------------------------------------------
+// Weekly meal prep. weekday: 0 = Sunday, 3 = Wednesday (JS getDay)
+// ------------------------------------------------------------
+const PREP = [
+  { key:"sun", weekday:0, title:{ar:"الأحد",en:"Sunday"}, tasks:[
+    {ar:"اطبخي عدس يكفي 3-4 أيام.",en:"Cook lentils for 3-4 days."},
+    {ar:"قسّمي السمك وجمّدي الحصص الزائدة.",en:"Portion fish and freeze extra servings."},
+    {ar:"اغسلي الخضار.",en:"Wash vegetables."},
+    {ar:"قسّمي الخبز والمكسرات.",en:"Portion bread and nuts."},
+    {ar:"جهّزي مكونات السموذي.",en:"Prepare ingredients for smoothies."}
   ]},
-  { id:"l2", num:{ar:"الثاني",en:"Second"}, title:{ar:"ستيك بكريمة الفطر",en:"Steak with mushroom cream"}, items:[
-    {ar:"120 غرام ستيك مشوي", en:"120g grilled steak"},
-    {ar:"5 ملعقة طعام كريمة طبخ كاملة الدسم", en:"5 tbsp full-fat cooking cream"},
-    {ar:"2 ملعقة صغيرة زيت / زبدة", en:"2 tsp oil / butter"},
-    {ar:"أضيفي الستيك مع الفطر (ملح وبهار)، ثم كريمة الطبخ لثوانٍ", en:"Add steak with mushrooms (salt & pepper), then cooking cream for a few seconds"}
-  ]},
-  { id:"l3", num:{ar:"الثالث",en:"Third"}, title:{ar:"برغر دجاج/لحمة مع الملفوف",en:"Chicken/beef burger with coleslaw"}, items:[
-    {ar:"90 غرام دجاج/لحمة البرغر", en:"90g chicken/beef burger"},
-    {ar:"1 شريحة جبنة (لتذوب فوقها)", en:"1 cheese slice (melted on top)"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة", en:"1 tsp oil/butter"},
-    {ar:"+ سلطة ملفوف: ملفوف + 5 ملعقة صغيرة مايونيز + قليل من السكر الاصطناعي + قليل من الخل + رشة ملح", en:"+ Coleslaw: cabbage + 5 tsp mayo + a little artificial sweetener + a little vinegar + pinch of salt"}
-  ], note:{ar:"الدجاج غير مغطى بالكعك.",en:"Chicken not coated in breading."}},
-  { id:"l4", num:{ar:"الرابع",en:"Fourth"}, title:{ar:"صدر دجاج مشوي مع الفطر",en:"Grilled chicken breast with mushrooms"}, items:[
-    {ar:"120 غرام صدر دجاج مشوي", en:"120g grilled chicken breast"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة", en:"1 tsp oil/butter"},
-    {ar:"مع الفطر الطبيعي (ملح وبهار) وصوص الثوم", en:"With fresh mushrooms (salt & pepper) and garlic sauce"},
-    {ar:"+ كوب سلطة مع 1 و 1/2 ملعقة طعام زيت", en:"+ 1 cup salad with 1½ tbsp oil"}
-  ]},
-  { id:"l5", num:{ar:"الخامس",en:"Fifth"}, title:{ar:"شاورما لحم",en:"Beef shawarma"}, items:[
-    {ar:"120 غرام لحمة شاورما", en:"120g beef shawarma"},
-    {ar:"انقعي مع: خل + بهار شاورما + 1 ملعقة صغيرة زيت + ملح + بهار أسود + سبع بهارات + بصل", en:"Marinate with: vinegar + shawarma spice + 1 tsp oil + salt + black pepper + seven-spice blend + onion"},
-    {ar:"ضعي في البراد 12 ساعة على الأقل، ثم اشويها على نار خفيفة", en:"Refrigerate at least 12 hours, then cook on low heat"},
-    {ar:"2 ملعقة طعام طراطور", en:"2 tbsp tahini sauce (taratour)"},
-    SALAD_3TSP
-  ]},
-  { id:"l6", num:{ar:"السادس",en:"Sixth"}, title:{ar:"شاورما دجاج",en:"Chicken shawarma"}, items:[
-    {ar:"120 غرام دجاج شاورما", en:"120g chicken shawarma"},
-    {ar:"انقعي مع: خل + بهار شاورما + 1 ملعقة صغيرة زيت + ملح + بهار أسود + سبع بهارات + ثوم", en:"Marinate with: vinegar + shawarma spice + 1 tsp oil + salt + black pepper + seven-spice blend + garlic"},
-    {ar:"ضعي في البراد 12 ساعة على الأقل، ثم اشويها على نار خفيفة", en:"Refrigerate at least 12 hours, then cook on low heat"},
-    {ar:"2 ملعقة طعام صوص الثوم", en:"2 tbsp garlic sauce"},
-    SALAD_2TSP
-  ]},
-  { id:"l7", num:{ar:"السابع",en:"Seventh"}, title:{ar:"فروج مشوي على الفحم",en:"Charcoal grilled chicken"}, items:[
-    {ar:"1/2 فروج مشوي على الفحم", en:"1/2 charcoal grilled chicken"},
-    {ar:"2 ملعقة طعام صوص الثوم", en:"2 tbsp garlic sauce"},
-    SALAD_2TSP
-  ]},
-  { id:"l8", num:{ar:"الثامن",en:"Eighth"}, title:{ar:"سلطة سيزر بالدجاج",en:"Chicken Caesar salad"}, items:[
-    {ar:"90 غرام دجاج", en:"90g chicken"},
-    {ar:"5 ملعقة طعام صوص السيزر", en:"5 tbsp Caesar dressing"},
-    {ar:"30 غرام جبنة مبروشة", en:"30g grated cheese"}
-  ]},
-  { id:"l9", num:{ar:"التاسع",en:"Ninth"}, title:{ar:"شيش طاووق",en:"Shish taouk"}, items:[
-    {ar:"120 غرام شيش طاووق (منزلي أو جاهز)", en:"120g shish taouk (homemade or ready)"},
-    {ar:"2 ملعقة طعام صوص الثوم", en:"2 tbsp garlic sauce"},
-    SALAD_2TSP
-  ]},
-  { id:"l10", num:{ar:"العاشر",en:"Tenth"}, title:{ar:"لحمة مشوية",en:"Grilled beef"}, items:[
-    {ar:"120 غرام لحمة مشوية (منزلية أو جاهزة)", en:"120g grilled beef (homemade or ready)"},
-    {ar:"2 ملعقة طعام حمص/متبل باذنجان", en:"2 tbsp hummus / baba ghanoush"},
-    SALAD_3TSP
-  ]},
-  { id:"l11", num:{ar:"الحادي عشر",en:"Eleventh"}, title:{ar:"كفتة مشوية",en:"Grilled kofta"}, items:[
-    {ar:"120 غرام كفتة مشوية", en:"120g grilled kofta"},
-    {ar:"2 ملعقة طعام حمص/متبل باذنجان", en:"2 tbsp hummus / baba ghanoush"},
-    SALAD_3TSP
-  ]},
-  { id:"l12", num:{ar:"الثاني عشر",en:"Twelfth"}, title:{ar:"تاكو بالخس",en:"Lettuce tacos"}, items:[
-    {ar:"90 غرام لحمة مفرومة", en:"90g ground beef"},
-    {ar:"1 ملعقة صغيرة زيت / زبدة", en:"1 tsp oil / butter"},
-    {ar:"1/3 أفوكادو", en:"1/3 avocado"},
-    {ar:"1/4 كوب جبنة مبروشة", en:"1/4 cup grated cheese"},
-    {ar:"1/4 كوب صوص تاكو + بندورة + خس", en:"1/4 cup taco sauce + tomato + lettuce"}
-  ]},
-  { id:"l13", num:{ar:"الثالث عشر",en:"Thirteenth"}, title:{ar:"فاهيتا بالخس",en:"Lettuce fajita"}, items:[
-    {ar:"120 غرام فاهيتا (بصل + فطر + فلفل حلو مقطعة)", en:"120g fajita (diced onion + mushrooms + bell pepper)"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة للخضار", en:"1 tsp oil/butter for vegetables"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة للدجاج المقطع", en:"1 tsp oil/butter for diced chicken"},
-    {ar:"بهار الفاهيتا + بهار الثوم + بهار أسود", en:"Fajita seasoning + garlic powder + black pepper"},
-    {ar:"1/2 أفوكادو", en:"1/2 avocado"}
-  ]},
-  { id:"l14", num:{ar:"الرابع عشر",en:"Fourteenth"}, title:{ar:"فيلي ستيك بالخس",en:"Philly cheesesteak lettuce wrap"}, items:[
-    {ar:"90 غرام ستيك مقطع شرائح رفيعة", en:"90g thinly sliced steak"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة للخضار + 1 ملعقة صغيرة للستيك", en:"1 tsp oil/butter for vegetables + 1 tsp for steak"},
-    {ar:"بصل + فلفل حلو + بهار الفيلادلفيا + ملح + بهار أسود", en:"Onion + bell pepper + Philadelphia seasoning + salt + black pepper"},
-    {ar:"1 شريحة جبنة تذوب فوق الستيك", en:"1 cheese slice melted over the steak"},
-    {ar:"4 ملعقة صغيرة مايونيز", en:"4 tsp mayonnaise"}
-  ]},
-  { id:"l15", num:{ar:"الخامس عشر",en:"Fifteenth"}, title:{ar:"سلطة التونا",en:"Tuna salad"}, items:[
-    {ar:"120 غرام تونا", en:"120g tuna"},
-    {ar:"كوب خس مقطع + 1/4 كوب فلفل حلو مقطع", en:"1 cup chopped lettuce + 1/4 cup chopped bell pepper"},
-    {ar:"8 زيتون أسود + 1/4 كوب بصل أخضر", en:"8 black olives + 1/4 cup green onion"},
-    {ar:"5 ملعقة صغيرة مايونيز + ملح + بهار", en:"5 tsp mayonnaise + salt + pepper"}
-  ]},
-  { id:"l16", num:{ar:"السادس عشر",en:"Sixteenth"}, title:{ar:"سمك فيليه",en:"Fish fillet"}, items:[
-    {ar:"120 غرام سمك فيليه", en:"120g fish fillet"},
-    {ar:"انقعيه ساعة مع ثوم + 1 ملعقة طعام زيت + 1 ملعقة صغيرة بهار الحبق + ملح + بهار أسود + حامض + بقدونس مفروم", en:"Marinate 1 hour with garlic + 1 tbsp oil + 1 tsp basil + salt + black pepper + lemon + chopped parsley"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة في الوعاء", en:"1 tsp oil/butter in the pan"},
-    {ar:"2 ملعقة طعام طراطور", en:"2 tbsp tahini sauce (taratour)"},
-    SALAD_2TSP
-  ]},
-  { id:"l17", num:{ar:"السابع عشر",en:"Seventeenth"}, title:{ar:"قريدس (روبيان)",en:"Shrimp"}, items:[
-    {ar:"120 غرام قريدس", en:"120g shrimp"},
-    {ar:"انقعيه ساعة مع ثوم + 1 ملعقة طعام زيت + 1 ملعقة صغيرة بهار حبق + ملح + بهار + حر + 1 ملعقة طعام صلصة طماطم + 1 ملعقة طعام خل أحمر", en:"Marinate 1 hour with garlic + 1 tbsp oil + 1 tsp basil + salt + pepper + chili + 1 tbsp tomato sauce + 1 tbsp red vinegar"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة في الوعاء، ثم الفرن", en:"1 tsp oil/butter in pan, then oven"},
-    SALAD_2TSP
-  ]},
-  { id:"l18", num:{ar:"الثامن عشر",en:"Eighteenth"}, title:{ar:"سلطة الكراب/السلمون والأفوكادو",en:"Crab/salmon & avocado salad"}, items:[
-    {ar:"120 غرام كراب أو سلمون", en:"120g crab or salmon"},
-    {ar:"3 ملعقة صغيرة مايونيز + ملعقة طعام حامض + ملعقة صغيرة كمون + 1/2 ملعقة صغيرة بابريكا", en:"3 tsp mayonnaise + 1 tbsp lemon + 1 tsp cumin + 1/2 tsp paprika"},
-    {ar:"ملح وبهار", en:"Salt and pepper"},
-    {ar:"2/3 أفوكادو مكعبات", en:"2/3 avocado diced"}
-  ]},
-  { id:"l19", num:{ar:"التاسع عشر",en:"Nineteenth"}, title:{ar:"كلمار",en:"Calamari"}, items:[
-    {ar:"120 غرام سمك الكلمار", en:"120g calamari"},
-    {ar:"انقعيه ساعة مع ثوم + 3 ملعقة صغيرة زيت + 1 ملعقة صغيرة بهار حبق + ملح + بهار أسود + حامض + حر", en:"Marinate 1 hour with garlic + 3 tsp oil + 1 tsp basil + salt + black pepper + lemon + chili"},
-    {ar:"1 ملعقة صغيرة زيت/زبدة في الوعاء، ثم الفرن", en:"1 tsp oil/butter in pan, then oven"},
-    SALAD_2TSP
-  ]},
-  { id:"l20", num:{ar:"العشرون",en:"Twentieth"}, title:{ar:"ساشيمي",en:"Sashimi"}, items:[
-    {ar:"120 غرام ساشيمي سلمون أو تونا", en:"120g salmon or tuna sashimi"},
-    {ar:"3/4 أفوكادو", en:"3/4 avocado"},
-    SALAD_2TSP
+  { key:"wed", weekday:3, title:{ar:"الأربعاء",en:"Wednesday"}, tasks:[
+    {ar:"جهّزي دفعة عدس جديدة.",en:"Prepare another batch of lentils."},
+    {ar:"جدّدي الخضار.",en:"Restock vegetables."},
+    {ar:"اسلقي بطاطا لليومين أو الثلاثة الجايين.",en:"Cook potatoes for the next 2-3 days."},
+    {ar:"فكّي السمك بأمان بالبراد.",en:"Thaw fish safely in the refrigerator."}
   ]}
 ];
+const PREP_NOTE = {
+  ar: "حطّي الأكل المطبوخ بالبراد فوراً، وجمّدي الحصص اللي ما رح تنأكل خلال 3-4 أيام.",
+  en: "Refrigerate cooked foods promptly and freeze portions that won't be eaten within 3-4 days."
+};
 
-// ---------- DINNER (same as breakfast) ----------
-const DINNER = BREAKFAST.map(b => ({ ...b, id: "d" + b.id.slice(1) }));
+// ------------------------------------------------------------
+// Workout. Indexed by JS getDay (0 = Sunday).
+// ------------------------------------------------------------
+const WORKOUT = {
+  name: { ar: "ضحى ضرغام: تمرين كامل للجسم 22 دقيقة", en: "Doha Dergham: 22-minute full-body workout" },
+  link: "https://www.youtube.com/results?search_query=Doha+Dergham+22+minute+full+body+workout",
+  schedule: ["rest", "workout", "workout", "recovery", "workout", "workout", "workout"],
+  types: {
+    workout:  { icon:"dumbbell", name:{ar:"تمرين",en:"Workout"} },
+    recovery: { icon:"activity", name:{ar:"مشي خفيف / إطالة",en:"Recovery walk / stretching"} },
+    rest:     { icon:"bed",      name:{ar:"راحة",en:"Rest"} }
+  },
+  notes: [
+    {ar:"ابدئي بثلاث تمارين بالأسبوع إذا لزم، وزيدي تدريجياً.",en:"Start with three workouts weekly if needed and build up gradually."},
+    {ar:"السعرات المحروقة تقريباً 70-120 سعرة بكل جلسة.",en:"Estimated calories burned: 70-120 kcal per session."},
+    {ar:"لبناء عضل أفضل، أضيفي تدريجياً تمارين مقاومة 2-3 مرات بالأسبوع.",en:"For better muscle development, gradually add resistance training 2-3 times weekly."}
+  ]
+};
 
-// ---------- SNACK 1 (7) ----------
-const SNACK1 = [
-  { id:"s1-1", num:{ar:"الأول",en:"First"}, items:[{ar:"كوب من الجلو لايت (Jello diet)",en:"1 cup Jello diet"}] },
-  { id:"s1-4", num:{ar:"الرابع",en:"Fourth"}, items:[{ar:"3 علكات خالية من السكر محلاة بالـ xylitol",en:"3 pieces sugar-free gum sweetened with xylitol"}] },
-  { id:"s1-5", num:{ar:"الخامس",en:"Fifth"}, items:[{ar:"3 حلوى (بونبون) خالية من السكر محلاة بالـ xylitol",en:"3 sugar-free candies (bon-bons) sweetened with xylitol"}] },
-  { id:"s1-6", num:{ar:"السادس",en:"Sixth"}, items:[
-    {ar:"1 شوكولا كاندريل dark (هذا النوع هو المسموح فقط)", en:"1 Canderel dark chocolate (this type only)"},
-    {ar:"أو شوكولا 20 غرام Lindt 85% or 90% cocoa", en:"Or 20g Lindt 85% or 90% cocoa chocolate"}
-  ]},
-  { id:"s1-7", num:{ar:"السابع",en:"Seventh"}, items:[{ar:"2 ملعقة صغيرة كوفي مايت كامل الدسم + نسكافيه",en:"2 tsp full-fat Coffee-Mate + Nescafé"}] },
-  { id:"s1-8", num:{ar:"الثامن",en:"Eighth"}, items:[{ar:"1/4 كوب فراولة أو توت بري + 1 ملعقة طعام كريمة خالية من السكر",en:"1/4 cup strawberries or cranberries + 1 tbsp sugar-free cream"}] }
+// ------------------------------------------------------------
+// PCOS + insulin resistance rules
+// ------------------------------------------------------------
+const RULES = [
+  {ar:"اجمعي الخبز والبطاطا وباقي النشويات مع بروتين.",en:"Pair bread, potatoes and other carbohydrates with protein."},
+  {ar:"الفاكهة الكاملة أفضل من العصير.",en:"Prefer whole fruit over juice."},
+  {ar:"كلي عدس وخضار بشكل منتظم.",en:"Eat lentils and vegetables regularly."},
+  {ar:"الهدف 30-35 غ ألياف، زيديها تدريجياً.",en:"Aim for 30-35 g fiber, increasing gradually."},
+  {ar:"امشي 10-15 دقيقة بعد الوجبات قدر الإمكان.",en:"Walk for 10-15 minutes after meals when possible."},
+  {ar:"تجنّبي المشروبات المحلاة بالسكر معظم الوقت.",en:"Avoid sugar-sweetened drinks most of the time."},
+  {ar:"لا تلغي النشويات.",en:"Do not eliminate carbohydrates."},
+  {ar:"تجنّبي الحرمان القاسي من السعرات.",en:"Avoid aggressive calorie restriction."},
+  {ar:"نامي 7-9 ساعات.",en:"Sleep 7-9 hours."},
+  {ar:"استمري على الميتفورمين تماماً كما هو موصوف.",en:"Continue metformin exactly as prescribed."}
 ];
+const METFORMIN_NOTE = {
+  ar: "ميتفورمين 500 ملغ: خذيه حسب الوصفة، وعادةً مع الأكل لتخفيف انزعاج المعدة. لا تغيّري الجرعة أو عدد المرات بدون استشارة طبية. اسألي طبيبك عن فحص فيتامين B12 بشكل دوري.",
+  en: "Metformin 500 mg: take according to the prescription, generally with food to reduce stomach upset. Do not change the dose or frequency without medical advice. Ask your clinician about periodic vitamin B12 monitoring."
+};
 
-// ---------- SNACK 2 (6) ----------
-const SNACK2 = [
-  { id:"s2-1", num:{ar:"الأول",en:"First"}, items:[{ar:"1/2 كوب من بزر دوار الشمس",en:"1/2 cup sunflower seeds"}] },
-  { id:"s2-2", num:{ar:"الثاني",en:"Second"}, items:[{ar:"10 حبات فول سوداني",en:"10 peanuts"}] },
-  { id:"s2-3", num:{ar:"الثالث",en:"Third"}, items:[{ar:"16 حبة لوز",en:"16 almonds"}] },
-  { id:"s2-4", num:{ar:"الرابع",en:"Fourth"}, items:[{ar:"20 حبة فستق حلبي",en:"20 pistachios"}] },
-  { id:"s2-5", num:{ar:"الخامس",en:"Fifth"}, items:[{ar:"4 ملعقة صغيرة زبدة الفول السوداني",en:"4 tsp peanut butter"}] },
-  { id:"s2-6", num:{ar:"السادس",en:"Sixth"}, items:[{ar:"12 حبة بندق",en:"12 hazelnuts"}] }
-];
+const PROGRESS = {
+  waistDueDays: 14,     // "every 2-4 weeks"
+  waistOverdueDays: 28,
+  note: { ar: "كل 2-4 أسابيع: قيسي محيط الخصر.", en: "Every 2-4 weeks: measure waist circumference." }
+};
 
-// ---------- Fat exchange ----------
-const FAT_EXCHANGE = [
-  [{ar:"زيتون أخضر",en:"Green olives"}, {ar:"10 حبات",en:"10 pieces"}],
-  [{ar:"زيتون أسود",en:"Black olives"}, {ar:"8 حبات",en:"8 pieces"}],
-  [{ar:"لوز",en:"Almonds"}, {ar:"6 حبات",en:"6 pieces"}],
-  [{ar:"بندق",en:"Hazelnuts"}, {ar:"6 حبات",en:"6 pieces"}],
-  [{ar:"فول سوداني",en:"Peanuts"}, {ar:"10 حبات",en:"10 pieces"}],
-  [{ar:"فستق حلبي",en:"Pistachios"}, {ar:"12 حبة",en:"12 pieces"}],
-  [{ar:"زيت",en:"Oil"}, {ar:"1 ملعقة صغيرة",en:"1 tsp"}],
-  [{ar:"زبدة",en:"Butter"}, {ar:"1 ملعقة صغيرة",en:"1 tsp"}],
-  [{ar:"صنوبر",en:"Pine nuts"}, {ar:"30 حبة",en:"30 pieces"}],
-  [{ar:"سمسم",en:"Sesame"}, {ar:"1 ملعقة طعام",en:"1 tbsp"}],
-  [{ar:"بذور الشيا",en:"Chia seeds"}, {ar:"1 ملعقة شاي",en:"1 tsp"}],
-  [{ar:"بذور الفلاكس",en:"Flax seeds"}, {ar:"1 ملعقة طعام",en:"1 tbsp"}],
-  [{ar:"مايونيز",en:"Mayonnaise"}, {ar:"1 ملعقة صغيرة",en:"1 tsp"}],
-  [{ar:"صوص بستو",en:"Pesto sauce"}, {ar:"1 ملعقة صغيرة",en:"1 tsp"}]
-];
-
-// ---------- Shopping list ----------
-const SHOPPING = [
-  { title:{ar:"🥬 الخضار المسموحة",en:"🥬 Allowed vegetables"}, items:[
-    {ar:"سبانخ",en:"Spinach"},{ar:"هليون",en:"Asparagus"},{ar:"باذنجان",en:"Eggplant"},
-    {ar:"بندورة (طماطم)",en:"Tomato"},{ar:"فطر (مشروم)",en:"Mushroom"},{ar:"خس",en:"Lettuce"},
-    {ar:"زهرة (قرنبيط)",en:"Cauliflower"},{ar:"خيار",en:"Cucumber"},{ar:"كايل",en:"Kale"},
-    {ar:"كرفس",en:"Celery"},{ar:"بصل أخضر",en:"Green onion"},{ar:"بصل أبيض",en:"White onion"},
-    {ar:"كوسى",en:"Zucchini"},{ar:"ملفوف (أبيض)",en:"White cabbage"},{ar:"بروكلي",en:"Broccoli"},
-    {ar:"نعناع طازج",en:"Fresh mint"},{ar:"زنجبيل طازج",en:"Fresh ginger"},{ar:"فلفل أخضر",en:"Green pepper"},
-    {ar:"فلفل حلو (أحمر)",en:"Red bell pepper"},{ar:"زعتر أخضر",en:"Fresh thyme"},
-    {ar:"هاليبينو (فلفل حار)",en:"Jalapeño"},{ar:"ثوم",en:"Garlic"},{ar:"بقدونس",en:"Parsley"},
-    {ar:"ليمون (حامض)",en:"Lemon"}
-  ]},
-  { title:{ar:"🥩 اللحوم والدواجن والأسماك",en:"🥩 Meat, poultry & fish"}, items:[
-    {ar:"بيض",en:"Eggs"},{ar:"لحم ستيك (بقري)",en:"Beef steak"},{ar:"لحمة مفرومة",en:"Ground beef"},
-    {ar:"لحمة بلرغ",en:"Burger beef"},{ar:"صدر دجاج",en:"Chicken breast"},{ar:"فخاذ دجاج",en:"Chicken thighs"},
-    {ar:"أجنحة دجاج",en:"Chicken wings"},{ar:"فروج كامل",en:"Whole chicken"},{ar:"لحمة شاورما",en:"Beef shawarma meat"},
-    {ar:"دجاج شاورما",en:"Chicken shawarma meat"},{ar:"كفتة",en:"Kofta"},{ar:"شيش طاووق",en:"Shish taouk"},
-    {ar:"سمك فيليه",en:"Fish fillet"},{ar:"سمك سلمون",en:"Salmon"},{ar:"ساشيمي سلمون / تونا",en:"Salmon / tuna sashimi"},
-    {ar:"تونا معلبة",en:"Canned tuna"},{ar:"قريدس (روبيان)",en:"Shrimp"},{ar:"كلمار (حبار)",en:"Calamari"},
-    {ar:"كراب (سرطان البحر)",en:"Crab"},{ar:"شرائح حبش (ديك رومي مدخن)",en:"Smoked turkey slices"},
-    {ar:"شرائح مرتديلا",en:"Mortadella slices"}
-  ]},
-  { title:{ar:"🧀 الأجبان ومنتجات الألبان",en:"🧀 Cheese & dairy"}, items:[
-    {ar:"جبنة قشقوان",en:"Kashkaval cheese"},{ar:"جبنة تشيدر",en:"Cheddar cheese"},
-    {ar:"جبنة عكاوي",en:"Akkawi cheese"},{ar:"جبنة دوبل كريم",en:"Double cream cheese"},
-    {ar:"جبنة فيتا",en:"Feta cheese"},{ar:"جبنة موزاريلا",en:"Mozzarella cheese"},
-    {ar:"جبنة كريمية (فيلادلفيا)",en:"Cream cheese (Philadelphia)"},{ar:"جبنة مبروشة (بارميزان)",en:"Grated cheese (Parmesan)"},
-    {ar:"جبنة حلومي",en:"Halloumi cheese"},{ar:"لبنة",en:"Labneh"},
-    {ar:"كريمة طبخ كاملة الدسم",en:"Full-fat cooking cream"},{ar:"كريمة خالية من السكر",en:"Sugar-free cream"}
-  ]},
-  { title:{ar:"🥜 المكسرات والبذور",en:"🥜 Nuts & seeds"}, items:[
-    {ar:"لوز",en:"Almonds"},{ar:"فستق حلبي",en:"Pistachios"},{ar:"فول سوداني",en:"Peanuts"},
-    {ar:"بندق",en:"Hazelnuts"},{ar:"صنوبر",en:"Pine nuts"},{ar:"بزر دوار الشمس",en:"Sunflower seeds"},
-    {ar:"سمسم",en:"Sesame"},{ar:"بذور الشيا",en:"Chia seeds"},{ar:"بذور الفلاكس (الكتان)",en:"Flax seeds"},
-    {ar:"زبدة الفول السوداني",en:"Peanut butter"}
-  ]},
-  { title:{ar:"🫒 الزيتون والزيوت والدهون",en:"🫒 Olives, oils & fats"}, items:[
-    {ar:"زيتون أخضر",en:"Green olives"},{ar:"زيتون أسود",en:"Black olives"},
-    {ar:"زيت زيتون",en:"Olive oil"},{ar:"زبدة",en:"Butter"}
-  ]},
-  { title:{ar:"🥣 الصلصات والتوابل",en:"🥣 Sauces & spices"}, items:[
-    {ar:"مايونيز كامل الدسم",en:"Full-fat mayonnaise"},{ar:"صويا صوص Kikoman",en:"Kikkoman soy sauce"},
-    {ar:"صوص رانش (Ranch)",en:"Ranch dressing"},{ar:"خردل",en:"Mustard"},{ar:"خل أبيض",en:"White vinegar"},
-    {ar:"خل بلسميك",en:"Balsamic vinegar"},{ar:"خل أحمر",en:"Red vinegar"},{ar:"صلصة طماطم",en:"Tomato sauce"},
-    {ar:"صوص الثوم",en:"Garlic sauce"},{ar:"صوص السيزر",en:"Caesar dressing"},{ar:"صوص طراطور",en:"Tahini sauce (taratour)"},
-    {ar:"صوص بستو (Pesto)",en:"Pesto sauce"},{ar:"صوص تاكو",en:"Taco sauce"},{ar:"ملح",en:"Salt"},
-    {ar:"فلفل أسود",en:"Black pepper"},{ar:"فلفل أحمر حار (شطة)",en:"Chili pepper"},
-    {ar:"بهار شاورما",en:"Shawarma seasoning"},{ar:"سبع بهارات",en:"Seven-spice blend"},
-    {ar:"بهار الفاهيتا",en:"Fajita seasoning"},{ar:"بهار الثوم",en:"Garlic powder"},
-    {ar:"بهار الفيلادلفيا",en:"Philadelphia seasoning"},{ar:"بابريكا",en:"Paprika"},{ar:"كمون",en:"Cumin"},
-    {ar:"قرفة",en:"Cinnamon"},{ar:"بهار الحبق",en:"Basil seasoning"},{ar:"متبل الحمص",en:"Hummus"},
-    {ar:"متبل الباذنجان",en:"Baba ghanoush"},{ar:"مكدوس",en:"Makdous (pickled eggplant)"}
-  ]},
-  { title:{ar:"☕ المشروبات",en:"☕ Drinks"}, items:[
-    {ar:"شاي أخضر",en:"Green tea"},{ar:"شاي أسود",en:"Black tea"},{ar:"يانسون",en:"Anise"},
-    {ar:"بابونج",en:"Chamomile"},{ar:"قهوة",en:"Coffee"},{ar:"نسكافيه",en:"Nescafé"},
-    {ar:"كوفي مايت كامل الدسم",en:"Full-fat Coffee-Mate"},{ar:"حليب اللوز غير المحلى",en:"Unsweetened almond milk"},
-    {ar:"حليب جوز الهند غير المحلى",en:"Unsweetened coconut milk"},{ar:"مياه غازية (صودا)",en:"Sparkling water (soda)"},
-    {ar:"مشروبات غازية دايت",en:"Diet sodas"},
-    {ar:"سكر اصطناعي (Canderel/Sucralose)",en:"Artificial sweetener (Canderel/Sucralose)"}
-  ]},
-  { title:{ar:"🍓 الفواكه المسموحة",en:"🍓 Allowed fruits"}, items:[
-    {ar:"أفوكادو",en:"Avocado"},{ar:"فراولة",en:"Strawberries"},{ar:"توت بري",en:"Cranberries"}
-  ]},
-  { title:{ar:"🍫 السناكات والمنتجات الخاصة",en:"🍫 Special snacks"}, items:[
-    {ar:"جلو لايت (Jelly Diet)",en:"Jello Diet"},
-    {ar:"علكة خالية من السكر محلاة بالـ Xylitol",en:"Sugar-free gum with Xylitol"},
-    {ar:"حلوى بونبون خالية من السكر محلاة بالـ Xylitol",en:"Sugar-free candies with Xylitol"},
-    {ar:"شوكولا كاندريل dark (Canderel Dark)",en:"Canderel Dark chocolate"},
-    {ar:"شوكولا Lindt 85% أو 90% كاكاو",en:"Lindt 85% or 90% cocoa chocolate"}
-  ]}
-];
-
-// ---------- UI Strings ----------
+// ------------------------------------------------------------
+// UI strings
+// ------------------------------------------------------------
 const UI = {
-  // Header
-  appTitle: { ar:"🥗 نظام الكيتو — Lynn", en:"🥗 Keto Plan — Lynn" },
-  appSub: { ar:"VIRTUAL DIET · Be wise, Choose right", en:"VIRTUAL DIET · Be wise, Choose right" },
-  dayBadge: { ar:"اليوم {n} من {total}", en:"Day {n} of {total}" },
-  notStarted: { ar:"لم يبدأ بعد", en:"Not started yet" },
+  appTitle: { ar:"خطة Lynn", en:"Lynn's Plan" },
+  appSub: { ar:"أكل · حركة · توازن", en:"Eat well · Move · Balance" },
+  docTitle: { ar:"خطة Lynn: أكل وتمارين", en:"Lynn's Plan: diet & workout" },
+  btn_lang: { ar:"EN", en:"عربي" },
+  weekBadge: { ar:"الأسبوع {w} · اليوم {d}", en:"Week {w} · Day {d}" },
 
-  // Tabs
-  tab_today: { ar:"🏠 اليوم", en:"🏠 Today" },
-  tab_weight: { ar:"⚖️ الوزن", en:"⚖️ Weight" },
-  tab_calendar: { ar:"📅 التقويم", en:"📅 Calendar" },
-  tab_breakfast: { ar:"🍳 الفطور", en:"🍳 Breakfast" },
-  tab_lunch: { ar:"🍽️ الغداء", en:"🍽️ Lunch" },
-  tab_dinner: { ar:"🌙 العشاء", en:"🌙 Dinner" },
-  tab_snacks: { ar:"🥜 السناكات", en:"🥜 Snacks" },
-  tab_shopping: { ar:"🛒 المشتريات", en:"🛒 Shopping" },
-  tab_allowed: { ar:"✅ المسموحات", en:"✅ Allowed" },
-  tab_photos: { ar:"📸 الصور", en:"📸 Photos" },
-  tab_favorites: { ar:"❤️ المفضلة", en:"❤️ Favorites" },
-  tab_settings: { ar:"⚙️ الإعدادات", en:"⚙️ Settings" },
+  tab_today: { ar:"اليوم", en:"Today" },
+  tab_plan: { ar:"الخطة", en:"Plan" },
+  tab_swaps: { ar:"البدائل", en:"Swaps" },
+  tab_shop: { ar:"تسوّق وتحضير", en:"Shop & prep" },
+  tab_move: { ar:"الحركة", en:"Move" },
+  tab_progress: { ar:"التقدّم", en:"Progress" },
+  tab_calendar: { ar:"التقويم", en:"Calendar" },
+  tab_guide: { ar:"الدليل", en:"Guide" },
+  tab_settings: { ar:"الإعدادات", en:"Settings" },
 
   // Today
-  todayHeader: { ar:"🏠 يومك اليوم", en:"🏠 Your day today" },
-  stat_day: { ar:"اليوم من 28", en:"Day of 28" },
-  stat_streak: { ar:"أيام متتالية", en:"Streak days" },
-  stat_water: { ar:"كاسات ماء", en:"Water cups" },
-  stat_meals: { ar:"وجبات اليوم", en:"Meals today" },
-  water_header: { ar:"💧 شرب الماء", en:"💧 Water intake" },
-  water_sub: { ar:"اضغطي على الكاس لتملي — الهدف 8 كاسات يومياً", en:"Tap a cup to fill it — target is 8 cups per day" },
-  meals_today: { ar:"🍽️ وجبات اليوم", en:"🍽️ Today's meals" },
-  timing_header: { ar:"⏰ التوقيتات المقترحة", en:"⏰ Suggested schedule" },
-  timing_note: { ar:"لا يوجد مواقيت محددة — وزّعي الوجبات حسب رغبتك خلال النهار.", en:"No fixed times — spread meals throughout the day as you wish." },
-  time_breakfast: { ar:"💧 ماء + 🍳 الفطور", en:"💧 Water + 🍳 Breakfast" },
-  time_snack1: { ar:"🥜 السناك الأول", en:"🥜 First snack" },
-  time_lunch: { ar:"🍽️ الغداء", en:"🍽️ Lunch" },
-  time_snack2: { ar:"🥤 السناك الثاني", en:"🥤 Second snack" },
-  time_dinner: { ar:"🌙 العشاء", en:"🌙 Dinner" },
-  t_range_1: { ar:"7-9 ص", en:"7-9 AM" },
-  t_range_2: { ar:"11 ص", en:"11 AM" },
-  t_range_3: { ar:"1-2 م", en:"1-2 PM" },
-  t_range_4: { ar:"4:30 م", en:"4:30 PM" },
-  t_range_5: { ar:"7:30 م", en:"7:30 PM" },
+  today: { ar:"اليوم", en:"Today" },
+  back_today: { ar:"رجوع لليوم", en:"Back to today" },
+  past_day: { ar:"عم تعدّلي يوم سابق", en:"Editing a past day" },
+  checklist: { ar:"قائمة اليوم", en:"Daily checklist" },
+  goals_met: { ar:"{n} من {t} أهداف", en:"{n} of {t} goals" },
+  streak: { ar:"{n} أيام متتالية", en:"{n}-day streak" },
+  streak_hint: { ar:"يوم ناجح = 7 أهداف أو أكثر", en:"Good day = 7+ goals met" },
+  meals: { ar:"وجبات اليوم", en:"Today's meals" },
+  meals_of: { ar:"وجبات {day}", en:"{day}'s meals" },
+  meal_target: { ar:"الهدف {a}-{b} سعرة", en:"Target {a}-{b} kcal" },
+  meal_est: { ar:"≈ {k} سعرة · {p} غ بروتين", en:"≈ {k} kcal · {p} g protein" },
+  mark_eaten: { ar:"تم الأكل", en:"Eaten" },
+  tap_to_mark: { ar:"اضغطي لتسجيل الوجبة", en:"Tap to mark eaten" },
+  nutrition: { ar:"تغذية اليوم (تقديري)", en:"Today's nutrition (estimate)" },
+  nutrition_hint: { ar:"محسوب من الوجبات اللي علّمتيها والإضافات. القيم تقريبية حسب ملصقات شائعة.", en:"Calculated from the meals you ticked plus extras. Values are approximate, based on typical labels." },
+  short_kcal: { ar:"ناقصك تقريباً {n} سعرة. أضيفي حصة صغيرة.", en:"About {n} kcal short. Add a small extra portion." },
+  short_protein: { ar:"ناقصك تقريباً {n} غ بروتين.", en:"About {n} g protein short." },
+  over_kcal: { ar:"فوق الهدف بتقريباً {n} سعرة.", en:"About {n} kcal over target." },
+  in_range: { ar:"ضمن الهدف ✓", en:"In range ✓" },
+  extras: { ar:"حصص إضافية", en:"Extra portions" },
+  extras_none: { ar:"ما في إضافات اليوم.", en:"No extras today." },
+  add: { ar:"إضافة", en:"Add" },
+  remove: { ar:"حذف", en:"Remove" },
+  water: { ar:"الماء", en:"Water" },
+  water_sub: { ar:"كل كاسة 250 مل · الهدف 2-2.5 ل", en:"Each glass is 250 ml · goal 2-2.5 L" },
+  habits: { ar:"عادات اليوم", en:"Today's habits" },
+  workout_today: { ar:"حركة اليوم", en:"Today's movement" },
+  done: { ar:"تم ✓", en:"Done ✓" },
+  mark_done: { ar:"علّمي كمنجز", en:"Mark done" },
+  rest_day: { ar:"يوم راحة. الراحة جزء من الخطة.", en:"Rest day. Rest is part of the plan." },
+  metformin: { ar:"الميتفورمين", en:"Metformin" },
+  metformin_sub: { ar:"حسب الوصفة، مع الأكل", en:"As prescribed, with food" },
+  taken: { ar:"أُخذ ✓", en:"Taken ✓" },
+  mark_taken: { ar:"علّمي كمأخوذ", en:"Mark taken" },
+  sleep: { ar:"النوم (الليلة الماضية)", en:"Sleep (last night)" },
+  sleep_unset: { ar:"غير مسجّل", en:"Not logged" },
+  hours: { ar:"ساعات", en:"hours" },
+  walks: { ar:"مشي بعد الأكل", en:"Post-meal walks" },
+  walks_sub: { ar:"10-15 دقيقة بعد الوجبات", en:"10-15 min after meals" },
+  prep_today: { ar:"يوم التحضير", en:"Prep day" },
 
-  meal_breakfast: { ar:"الفطور", en:"Breakfast" },
-  meal_lunch: { ar:"الغداء", en:"Lunch" },
-  meal_dinner: { ar:"العشاء", en:"Dinner" },
-  meal_snack1: { ar:"سناك 1", en:"Snack 1" },
-  meal_snack2: { ar:"سناك 2", en:"Snack 2" },
-  meal_done: { ar:"✅ تم", en:"✅ Done" },
-  meal_not_done: { ar:"لم يتم بعد", en:"Not done yet" },
-  btn_done: { ar:"✓ تم", en:"✓ Done" },
-  btn_undo: { ar:"إلغاء", en:"Undo" },
+  // checklist items
+  ck_kcal: { ar:"السعرات", en:"Calories" },
+  ck_protein: { ar:"البروتين", en:"Protein" },
+  ck_fiber: { ar:"الألياف", en:"Fiber" },
+  ck_water: { ar:"الماء", en:"Water" },
+  ck_veg: { ar:"الخضار", en:"Vegetables" },
+  ck_fruit: { ar:"الفاكهة", en:"Fruit" },
+  ck_move: { ar:"تمرين أو تعافي", en:"Workout or recovery" },
+  ck_metformin: { ar:"الميتفورمين", en:"Metformin" },
+  ck_sleep: { ar:"النوم", en:"Sleep" },
+  carbs: { ar:"النشويات", en:"Carbs" },
+  fat: { ar:"الدهون", en:"Fat" },
+  servings: { ar:"حصص", en:"servings" },
 
-  // Weight
-  weight_header: { ar:"⚖️ متابعة الوزن", en:"⚖️ Weight tracking" },
-  weight_current: { ar:"الوزن الحالي", en:"Current weight" },
-  weight_lost: { ar:"الفاقد (كغ)", en:"Lost (kg)" },
-  weight_goal: { ar:"الهدف (IBW)", en:"Goal (IBW)" },
-  weight_togo: { ar:"باقي للهدف", en:"Remaining" },
-  weight_input: { ar:"الوزن (كغ)", en:"Weight (kg)" },
-  btn_add: { ar:"إضافة", en:"Add" },
-  chart_weight: { ar:"الوزن (كغ)", en:"Weight (kg)" },
-  chart_goal: { ar:"الهدف (IBW)", en:"Goal (IBW)" },
+  // Plan
+  plan_title: { ar:"خطة الأيام السبعة", en:"My 7-day meal plan" },
+  day_total: { ar:"مجموع اليوم (تقديري)", en:"Day total (estimate)" },
+  daily_structure: { ar:"توزيع الوجبات", en:"Daily meal structure" },
+
+  // Swaps
+  swaps_title: { ar:"بدائل الأكل", en:"Food substitutions" },
+  swaps_sub: { ar:"بدّلي أي صنف بوجبة بصنف من نفس المجموعة.", en:"Swap any item in a meal for one from the same group." },
+  col_food: { ar:"الصنف", en:"Food" },
+  col_portion: { ar:"الكمية", en:"Portion" },
+  col_kcal: { ar:"≈ سعرات", en:"≈ kcal" },
+  medium: { ar:"وسط", en:"medium" },
+  veg_title: { ar:"الخضار", en:"Vegetables" },
+
+  // Shop & prep
+  grocery_title: { ar:"قائمة التسوّق الأسبوعية", en:"Weekly grocery list" },
+  grocery_progress: { ar:"{n} من {t} بالسلة", en:"{n} of {t} in the basket" },
+  new_week: { ar:"أسبوع جديد (مسح العلامات)", en:"New week (clear ticks)" },
+  new_week_confirm: { ar:"مسح كل العلامات من قائمة التسوّق؟", en:"Clear all ticks on the grocery list?" },
+  prep_title: { ar:"التحضير الأسبوعي", en:"Weekly meal prep" },
+  prep_for: { ar:"تحضير {day} {date}", en:"{day} prep, {date}" },
+
+  // Move
+  move_title: { ar:"برنامج التمارين", en:"Workout schedule" },
+  this_week: { ar:"هذا الأسبوع: {n} من {t} تمارين", en:"This week: {n} of {t} workouts" },
+  open_video: { ar:"افتحي التمارين على يوتيوب", en:"Find the workout on YouTube" },
+
+  // Progress
+  progress_title: { ar:"التقدّم", en:"Progress" },
+  weight: { ar:"الوزن", en:"Weight" },
+  waist: { ar:"الخصر", en:"Waist" },
+  start_w: { ar:"وزن البداية", en:"Start weight" },
+  current_w: { ar:"الوزن الحالي", en:"Current weight" },
+  change: { ar:"التغيير", en:"Change" },
+  waist_last: { ar:"آخر قياس خصر", en:"Last waist" },
+  waist_change: { ar:"تغيير الخصر", en:"Waist change" },
+  waist_next: { ar:"قياس الخصر الجاي", en:"Next waist check" },
+  waist_due_now: { ar:"صار وقته", en:"Due now" },
+  waist_overdue: { ar:"متأخر", en:"Overdue" },
+  waist_in: { ar:"بعد {n} يوم", en:"In {n} days" },
+  waist_first: { ar:"سجّلي أول قياس", en:"Log your first one" },
+  log_weight: { ar:"تسجيل الوزن (كغ)", en:"Log weight (kg)" },
+  log_waist: { ar:"تسجيل الخصر (سم)", en:"Log waist (cm)" },
+  no_entries: { ar:"ما في قياسات بعد.", en:"No entries yet." },
+  progress_body_note: { ar:"الهدف خسارة دهون وبناء عضل، فالخصر مؤشر أهم من الميزان لحاله.", en:"The goal is fat loss plus muscle gain, so your waist tells you more than the scale alone." },
 
   // Calendar
-  cal_header: { ar:"📅 تقويم 28 يوم", en:"📅 28-day calendar" },
-  cal_note: { ar:"كل مربع يعرض عدد الوجبات + الماء التي أتممتيها ذلك اليوم. اضغطي على أي يوم لعرض التفاصيل.", en:"Each square shows meals + water completed that day. Tap a day for details." },
-  cal_legend: { ar:"اللون الأخضر = يوم مكتمل 6/6 · الأصفر = يوم جزئي · الرمادي = لم يُسجّل", en:"Green = fully complete 6/6 · Yellow = partial · Gray = not logged" },
-  cal_no_start: { ar:"حددي تاريخ بدء النظام من الإعدادات أولاً.", en:"Set the start date from Settings first." },
+  cal_title: { ar:"التقويم", en:"Calendar" },
+  cal_legend: { ar:"اللون = عدد الأهداف المحققة. اضغطي على يوم لتعديله.", en:"Color = goals met. Tap a day to open it." },
 
-  // Meals
-  pick_for_me: { ar:"🎲 اختاري لي", en:"🎲 Pick for me" },
-  breakfast_note: { ar:"اختاري خياراً واحداً + جدول الخضار. جميع الأجبان مسموحة.", en:"Choose one option + the vegetable list. All cheeses allowed." },
-  lunch_note: { ar:"شرائح الجبنة: موزاريلا أو تشيدر كاملة الدسم. المايونيز كامل الدسم. الدجاج: صدر/فخذ/جناح.", en:"Cheese slices: full-fat mozzarella or cheddar. Full-fat mayonnaise. Chicken: breast/thigh/wing." },
-  dinner_note: { ar:"مطابقة لخيارات الفطور. جميع الأجبان مسموحة.", en:"Identical to breakfast options. All cheeses allowed." },
-  option_label: { ar:"الخيار", en:"Option" },
-
-  // Shopping
-  shop_header: { ar:"🛒 قائمة المشتريات", en:"🛒 Shopping list" },
-  shop_sub: { ar:"ضعي علامة على كل شيء اشتريتيه — تُحفظ تلقائياً.", en:"Tick everything you've bought — saved automatically." },
-  shop_reset: { ar:"مسح الكل", en:"Clear all" },
-  shop_check_all: { ar:"تحديد الكل", en:"Check all" },
-  shop_reset_confirm: { ar:"مسح جميع العلامات؟", en:"Clear all checks?" },
-
-  // Allowed
-  allowed_header: { ar:"✅ المسموحات", en:"✅ Allowed items" },
-  allowed_veg: { ar:"الخضار المسموحة", en:"Allowed vegetables" },
-  allowed_sauce: { ar:"الصوصات المسموحة", en:"Allowed sauces" },
-  allowed_drinks: { ar:"المشروبات المسموحة", en:"Allowed drinks" },
-  allowed_sweetener: { ar:"السكر الاصطناعي", en:"Artificial sweetener" },
-  sweetener_text: { ar:"يمكن استعماله يومياً بكمية: <strong>حبتان</strong> أو <strong>ظرفان</strong> أو <strong>ملعقتي شاي</strong>.", en:"Daily allowance: <strong>2 tablets</strong>, <strong>2 sachets</strong>, or <strong>2 tsp</strong>." },
-  fat_header: { ar:"🔄 جدول استبدال الدهون", en:"🔄 Fat exchange table" },
-  fat_note: { ar:"يجب تناول كل حصص الدهون. يمكن استبدال أي خيار بآخر من الجدول.", en:"All fat portions must be eaten. Any item can be swapped with another from the table." },
-  col_sauce: { ar:"الصوص", en:"Sauce" },
-  col_qty: { ar:"الكمية", en:"Quantity" },
-  col_option: { ar:"الخيار", en:"Option" },
-  col_equiv: { ar:"الكمية المعادلة", en:"Equivalent amount" },
-
-  // Photos
-  photo_header: { ar:"📸 صور الوجبات", en:"📸 Meal photos" },
-  photo_sub: { ar:"صوّري وجباتك اليومية — كل الصور محفوظة محلياً على جهازك فقط.", en:"Snap your daily meals — all stored locally on your device only." },
-  photo_full: { ar:"لا توجد مساحة كافية لحفظ الصورة. احذفي بعض الصور القديمة.", en:"Not enough storage. Delete some old photos." },
-  photo_delete_confirm: { ar:"حذف هذه الصورة؟", en:"Delete this photo?" },
-
-  // Favorites
-  fav_header: { ar:"❤️ الوجبات المفضلة", en:"❤️ Favorite meals" },
-  fav_sub: { ar:"الخيارات التي أضفتيها بالقلب من صفحات الوجبات.", en:"Options you've hearted from the meal pages." },
-  fav_empty: { ar:"لا توجد وجبات مفضلة بعد. اضغطي 🤍 على أي خيار في صفحات الوجبات لإضافته.", en:"No favorites yet. Tap 🤍 on any meal option to add it." },
+  // Guide
+  guide_goal: { ar:"الهدف", en:"Goal" },
+  guide_details: { ar:"معلوماتي", en:"My details" },
+  guide_targets: { ar:"الأهداف اليومية", en:"Daily targets" },
+  guide_rules: { ar:"قواعد تكيّس المبايض ومقاومة الإنسولين", en:"PCOS + insulin resistance rules" },
+  guide_portions: { ar:"قواعد الكميات", en:"Portion rules" },
+  guide_progress: { ar:"متابعة التقدّم", en:"Progress check" },
+  col_nutrient: { ar:"العنصر", en:"Nutrient" },
+  col_target: { ar:"الهدف", en:"Target" },
+  years: { ar:"سنة", en:"years" },
 
   // Settings
-  settings_header: { ar:"⚙️ الإعدادات", en:"⚙️ Settings" },
-  start_date: { ar:"تاريخ بدء النظام", en:"Plan start date" },
-  start_date_saved_label: { ar:"التاريخ المحفوظ:", en:"Saved date:" },
-  start_date_none: { ar:"لم يُحفظ بعد", en:"Not saved yet" },
-  start_date_active_label: { ar:"النظام نشط منذ", en:"Plan active since" },
-  start_date_locked_hint: { ar:"يمكن تعديل تاريخ البدء عند الحاجة — البيانات المسجلة لا تتأثر.", en:"You can edit the start date if needed — logged data is not affected." },
-  btn_save: { ar:"حفظ", en:"Save" },
-  start_saved: { ar:"تم حفظ تاريخ البدء ✅", en:"Start date saved ✅" },
-  choose_date: { ar:"اختاري تاريخ", en:"Choose a date" },
-  person_info: { ar:"المعلومات الشخصية", en:"Personal info" },
-  info_name: { ar:"الاسم", en:"Name" },
-  info_weight: { ar:"الوزن الابتدائي", en:"Starting weight" },
-  info_height: { ar:"الطول", en:"Height" },
-  info_age: { ar:"العمر", en:"Age" },
-  info_bmi: { ar:"BMI", en:"BMI" },
-  info_ibw: { ar:"IBW", en:"IBW" },
-  info_water: { ar:"الماء", en:"Water" },
-  info_duration: { ar:"المدة", en:"Duration" },
-  export_import: { ar:"تصدير / استيراد", en:"Export / import" },
-  btn_export: { ar:"📤 تصدير البيانات", en:"📤 Export data" },
-  btn_import: { ar:"📥 استيراد", en:"📥 Import" },
-  btn_print: { ar:"🖨️ طباعة", en:"🖨️ Print" },
-  import_confirm: { ar:"سيتم استبدال جميع البيانات الحالية. متابعة؟", en:"All current data will be replaced. Continue?" },
-  invalid_file: { ar:"ملف غير صالح", en:"Invalid file" },
-  danger_zone: { ar:"منطقة الخطر", en:"Danger zone" },
-  btn_reset_all: { ar:"🗑️ مسح جميع البيانات", en:"🗑️ Reset all data" },
-  reset_confirm1: { ar:"هل أنت متأكدة؟ سيتم حذف كل البيانات ولا يمكن استرجاعها.", en:"Are you sure? All data will be deleted and cannot be recovered." },
-  reset_confirm2: { ar:"تأكيد أخير — حذف كل شيء؟", en:"Final confirmation — delete everything?" },
+  settings_title: { ar:"الإعدادات", en:"Settings" },
+  language: { ar:"اللغة", en:"Language" },
+  start_date: { ar:"تاريخ بدء الخطة", en:"Plan start date" },
+  save: { ar:"حفظ", en:"Save" },
+  saved: { ar:"تم الحفظ ✓", en:"Saved ✓" },
+  profile: { ar:"المعلومات الشخصية", en:"Profile" },
+  age: { ar:"العمر", en:"Age" },
+  height: { ar:"الطول (سم)", en:"Height (cm)" },
+  start_weight: { ar:"وزن البداية (كغ)", en:"Start weight (kg)" },
+  labels_title: { ar:"ملصقات منتجاتك", en:"Your product labels" },
+  labels_sub: { ar:"الخطة بتقول افحصي الملصقات. حطّي القيم لكل 100 غ (أو 100 مل للحليب) من العبوة لتصير الحسابات أدق.", en:"The plan says to check labels. Enter the per 100 g values (100 ml for milk) from your packs so the estimates get more accurate." },
+  l_kcal: { ar:"سعرات", en:"kcal" },
+  l_p: { ar:"بروتين", en:"protein" },
+  l_c: { ar:"نشويات", en:"carbs" },
+  l_f: { ar:"دهون", en:"fat" },
+  reset_labels: { ar:"رجوع للقيم الافتراضية", en:"Reset to defaults" },
+  backup: { ar:"نسخة احتياطية", en:"Backup" },
+  export: { ar:"تصدير", en:"Export" },
+  import: { ar:"استيراد", en:"Import" },
+  imported: { ar:"تم الاستيراد ✓", en:"Imported ✓" },
+  import_bad: { ar:"الملف غير صالح", en:"That file isn't a valid backup" },
+  danger: { ar:"منطقة الخطر", en:"Danger zone" },
+  reset_all: { ar:"مسح كل البيانات", en:"Erase all data" },
+  reset_confirm: { ar:"متأكدة؟ رح تنمسح كل البيانات من هالجهاز.", en:"Are you sure? All data on this device will be erased." },
 
-  // Misc
-  kg: { ar:"كغ", en:"kg" },
-  cm: { ar:"سم", en:"cm" },
-  years: { ar:"سنة", en:"years" },
-  days: { ar:"يوم", en:"days" },
-  cups_day: { ar:"كاسات/يوم", en:"cups/day" },
-  water_cups: { ar:"كاسات ماء", en:"water cups" },
-  modal_close: { ar:"إغلاق", en:"Close" },
-  modal_pick_again: { ar:"🎲 اختيار آخر", en:"🎲 Pick again" },
-  modal_random_title: { ar:"اختيار عشوائي", en:"Random pick" },
-  day_label: { ar:"اليوم", en:"Day" },
-  date_value_invalid: { ar:"أدخلي تاريخ ووزن صحيح", en:"Enter a valid date and weight" },
-  btn_lang: { ar:"EN", en:"عربي" },
-
-  // Empty states
-  empty_weight_title: { ar:"لم تسجلي وزنك بعد", en:"No weight logged yet" },
-  empty_weight_sub: { ar:"سجّلي وزنك الأول لتبدأ متابعة تقدمك على المخطط.", en:"Log your first weight to start tracking progress on the chart." },
-  empty_favs_title: { ar:"لا توجد وجبات مفضلة بعد", en:"No favorite meals yet" },
-  empty_favs_sub: { ar:"اضغطي على أيقونة القلب في أي خيار من الوجبات لحفظه هنا.", en:"Tap the heart icon on any meal option to save it here for quick access." },
-  empty_photos_title: { ar:"لا توجد صور وجبات بعد", en:"No meal photos yet" },
-  empty_photos_sub: { ar:"اضغطي على زر الوجبة لإضافة صورة لها.", en:"Tap a meal button above to add a photo for it." },
-
-  // Install banner
-  install_title: { ar:"أضيفي التطبيق إلى الشاشة الرئيسية", en:"Add to your home screen" },
-  install_sub: { ar:"استخدمي التطبيق كأنه تطبيق حقيقي — بدون فتح المتصفح.", en:"Use it like a real app — without opening the browser." },
-  install_cta: { ar:"تثبيت", en:"Install" },
-  install_ios_hint: { ar:"اضغطي على زر المشاركة في سفاري ثم 'إضافة إلى الشاشة الرئيسية'.", en:"Tap the Share button in Safari, then 'Add to Home Screen'." },
-  dismiss: { ar:"لاحقاً", en:"Later" },
-
-  // Milestones & celebrations
-  milestone_3_title: { ar:"3 أيام متتالية! 🎉", en:"3-day streak! 🎉" },
-  milestone_3_sub: { ar:"بدأتِ بقوة. استمري!", en:"Strong start. Keep going!" },
-  milestone_7_title: { ar:"أسبوع كامل! 🔥", en:"A full week! 🔥" },
-  milestone_7_sub: { ar:"ربع الطريق. أنتِ رائعة.", en:"Quarter of the way there. You're amazing." },
-  milestone_14_title: { ar:"أسبوعان متتاليان! ⭐", en:"Two weeks in a row! ⭐" },
-  milestone_14_sub: { ar:"نصف الطريق — استمري على هذا النحو.", en:"Halfway there — keep this momentum." },
-  milestone_28_title: { ar:"أتممتِ الـ 28 يوماً! 👑", en:"28 days complete! 👑" },
-  milestone_28_sub: { ar:"أنتِ بطلة. هذا إنجاز حقيقي.", en:"You're a champion. This is a real achievement." },
-
-  // Weekly insights
-  insights_header: { ar:"📊 هذا الأسبوع", en:"📊 This week" },
-  insights_days: { ar:"أيام مكتملة", en:"Days complete" },
-  insights_water: { ar:"كاسات ماء", en:"Water cups" },
-  insights_weight_change: { ar:"تغيّر الوزن", en:"Weight change" },
-  insights_empty: { ar:"لا توجد بيانات هذا الأسبوع بعد.", en:"No data for this week yet." },
-
-  // Cheats
-  tab_cheats: { ar:"🍩 الغش", en:"🍩 Cheats" },
-  cheats_header: { ar:"🍩 سجل الغش", en:"🍩 Cheat log" },
-  cheats_sub: { ar:"سجّلي أي شيء أكلتيه خارج النظام أو بكميات زائدة عن المسموح.", en:"Log anything eaten off-plan or above the allowed amount." },
-  stat_cheats: { ar:"غش اليوم", en:"Cheats today" },
-  cheat_kind: { ar:"النوع", en:"Type" },
-  cheat_kind_excess: { ar:"زيادة عن المسموح", en:"Excess of allowed" },
-  cheat_kind_banned: { ar:"ممنوع", en:"Banned" },
-  cheat_excess_help: { ar:"اختاري عنصراً من قوائم النظام تجاوزت كميته.", en:"Pick an item from the plan whose portion was exceeded." },
-  cheat_banned_help: { ar:"اكتبي ما أكلتيه (مثلاً: قطعة كاتو، شريحة بيتزا، علبة شيبس).", en:"Write what was eaten (e.g. cake slice, pizza slice, chips bag)." },
-  cheat_category: { ar:"الفئة", en:"Category" },
-  cheat_item: { ar:"العنصر", en:"Item" },
-  cheat_select_category: { ar:"اختاري فئة…", en:"Choose a category…" },
-  cheat_select_item: { ar:"اختاري عنصر…", en:"Choose an item…" },
-  cheat_qty: { ar:"الكمية / الحجم", en:"Qty / size" },
-  cheat_qty_placeholder: { ar:"مثلاً: 2x المسموح، كوب", en:"e.g. 2× allowed, 1 cup" },
-  cheat_name_placeholder: { ar:"اسم الطعام", en:"Food name" },
-  cheat_note: { ar:"ملاحظة", en:"Note" },
-  cheat_note_placeholder: { ar:"اختياري — متى، لماذا، كيف شعرتِ…", en:"Optional — when, why, how it felt…" },
-  cheat_date: { ar:"التاريخ", en:"Date" },
-  btn_log_cheat: { ar:"➕ تسجيل الغش", en:"➕ Log cheat" },
-  cheat_logged: { ar:"تم تسجيل الغش", en:"Cheat logged" },
-  cheat_recent: { ar:"السجل الأخير", en:"Recent log" },
-  cheat_empty_today: { ar:"لا غش اليوم — يوم نظيف ✓", en:"No cheats today — clean day ✓" },
-  cheat_empty_all: { ar:"لا يوجد سجل غش بعد.", en:"No cheats logged yet." },
-  cheat_delete_confirm: { ar:"حذف هذا السجل؟", en:"Delete this entry?" },
-  cheat_stats: { ar:"الإحصائيات", en:"Stats" },
-  cheat_stat_today: { ar:"اليوم", en:"Today" },
-  cheat_stat_week: { ar:"آخر 7 أيام", en:"Last 7 days" },
-  cheat_stat_total: { ar:"المجموع الكلي", en:"All-time total" },
-  cheat_stat_clean: { ar:"أيام نظيفة من 28", en:"Clean days of 28" },
-  cheat_cat_excess: { ar:"المسموحات", en:"Allowed items" },
-  cheat_cat_meals: { ar:"الوجبات", en:"Meals" },
-  cheat_cat_veg: { ar:"الخضار", en:"Vegetables" },
-  cheat_cat_sauces: { ar:"الصوصات", en:"Sauces" },
-  cheat_cat_drinks: { ar:"المشروبات", en:"Drinks" },
-  cheat_cat_fats: { ar:"الدهون", en:"Fats" },
-  cheat_day_modal_label: { ar:"غش هذا اليوم", en:"Cheats on this day" },
-  cheat_day_none: { ar:"لا غش مسجل في هذا اليوم.", en:"No cheats logged on this day." },
-  cheat_legend_dot: { ar:"النقطة الحمراء = يوم فيه غش", en:"Red dot = day with cheats" },
-
-  // Report
-  rpt_title: { ar:"تقرير نظام الكيتو", en:"Keto Plan Report" },
-  rpt_printed: { ar:"تاريخ التقرير", en:"Printed" },
-  rpt_start: { ar:"تاريخ البدء", en:"Start date" },
-  rpt_day: { ar:"اليوم", en:"Day" },
-  rpt_summary: { ar:"الملخص", en:"Summary" },
-  rpt_starting_w: { ar:"الوزن الابتدائي", en:"Starting weight" },
-  rpt_current_w: { ar:"الوزن الحالي", en:"Current weight" },
-  rpt_lost: { ar:"الفاقد", en:"Lost" },
-  rpt_goal: { ar:"الهدف (IBW)", en:"Goal (IBW)" },
-  rpt_remaining: { ar:"المتبقي للهدف", en:"Remaining to goal" },
-  rpt_streak: { ar:"السلسلة الحالية", en:"Current streak" },
-  rpt_total_cheats: { ar:"إجمالي الغش", en:"Total cheats" },
-  rpt_clean_days: { ar:"أيام نظيفة", en:"Clean days" },
-  rpt_meals_logged: { ar:"وجبات مسجلة", en:"Meals logged" },
-  rpt_water_total: { ar:"كاسات الماء (مجموع)", en:"Water cups (total)" },
-  rpt_full_days: { ar:"أيام مكتملة 100%", en:"100% complete days" },
-  rpt_weight_section: { ar:"تطور الوزن", en:"Weight progress" },
-  rpt_weight_none: { ar:"لم تُسجَّل قياسات وزن.", en:"No weight entries logged." },
-  rpt_col_date: { ar:"التاريخ", en:"Date" },
-  rpt_col_weight: { ar:"الوزن (كغ)", en:"Weight (kg)" },
-  rpt_col_delta: { ar:"الفرق عن البداية", en:"Δ from start" },
-  rpt_adherence: { ar:"الالتزام — 28 يوماً", en:"28-day adherence" },
-  rpt_no_start: { ar:"تاريخ البدء غير محدد.", en:"Start date not set." },
-  rpt_legend: { ar:"أخضر = يوم مكتمل · أصفر = جزئي · رمادي = لم يُسجّل · ● أحمر = غش", en:"Green = full day · Yellow = partial · Gray = no log · ● red = cheat" },
-  rpt_cheats_section: { ar:"سجل الغش", en:"Cheat log" },
-  rpt_cheats_breakdown: { ar:"{total} مجموع · {excess} زيادة · {banned} ممنوع", en:"{total} total · {excess} excess · {banned} banned" },
-  rpt_no_cheats: { ar:"لا يوجد غش مسجل — أداء ممتاز ✓", en:"No cheats logged — clean record ✓" },
-  rpt_excess_label: { ar:"زيادة", en:"EXCESS" },
-  rpt_banned_label: { ar:"ممنوع", en:"BANNED" },
-  rpt_footer: { ar:"تقرير خاص — Lynn Hamad Keto", en:"Private report — Lynn Hamad Keto" },
-  rpt_daily_section: { ar:"السجل اليومي", en:"Daily log" },
-  rpt_no_daily: { ar:"لا توجد أيام مسجلة بعد.", en:"No days logged yet." },
-  rpt_col_water: { ar:"الماء", en:"Water" },
-  rpt_col_meals: { ar:"الوجبات", en:"Meals" },
-  rpt_col_cheats: { ar:"الغش", en:"Cheats" },
-
-  // Editable person info
-  btn_save_person: { ar:"💾 حفظ المعلومات", en:"💾 Save info" },
-  person_saved: { ar:"تم حفظ المعلومات ✅", en:"Info saved ✅" },
-  person_bmi_auto: { ar:"يُحتسب تلقائياً", en:"auto-calculated" },
-  btn_edit_start: { ar:"✏️ تعديل", en:"✏️ Edit" },
-  start_date_locked_hint_v2: { ar:"يمكن تعديل تاريخ البدء عند الحاجة — البيانات المسجلة لا تتأثر.", en:"You can edit the start date if needed — logged data is not affected." }
+  milestone: { ar:"{n} أيام ناجحة ورا بعض!", en:"{n} good days in a row!" },
+  milestone_sub: { ar:"استمري، عم تعملي شي حلو لجسمك.", en:"Keep going, you're doing something good for your body." }
 };

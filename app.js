@@ -1,1464 +1,898 @@
 // ============================================================
-// LYNN KETO — App logic (bilingual ar/en)
+// LYNN PLAN: app logic
+// All data stays in localStorage on this device.
 // ============================================================
 
-const LS_KEY = "lynn-keto-v1";
-const LANG_KEY = "lynn-keto-lang";
+const LS_KEY = "lynn-plan-v1";
+const LANG_KEY = "lynn-plan-lang";
 
-let lang = localStorage.getItem(LANG_KEY) || "ar";
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
-// ---------- i18n helpers ----------
-function t(x) {
-  if (x == null) return "";
-  if (typeof x === "string") return x;
-  return x[lang] ?? x.ar ?? x.en ?? "";
-}
+let lang = lsGet(LANG_KEY) || "en";
+
+// ---------- i18n ----------
+function t(x) { return x ? (x[lang] != null ? x[lang] : (x.en || "")) : ""; }
 function tUI(key, vars) {
-  let s = t(UI[key]);
-  if (vars) Object.entries(vars).forEach(([k,v]) => { s = s.replace("{"+k+"}", v); });
+  let s = t(UI[key]) || key;
+  if (vars) Object.keys(vars).forEach(k => { s = s.split("{" + k + "}").join(vars[k]); });
   return s;
 }
-function localizedNumber(n) {
-  return String(n);
+const UNITS = {
+  kcal: { ar: "سعرة", en: "kcal" },
+  g: { ar: "غ", en: "g" },
+  ml: { ar: "مل", en: "ml" },
+  L: { ar: "ل", en: "L" },
+  h: { ar: "س", en: "h" },
+  kg: { ar: "كغ", en: "kg" },
+  cm: { ar: "سم", en: "cm" }
+};
+function u(key) { return t(UNITS[key]); }
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 }
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function num(n, d) { return (+n).toFixed(d || 0).replace(/\.0+$/, ""); }
 
-// ---------- Storage ----------
-function loadState() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return defaultState();
-    return { ...defaultState(), ...JSON.parse(raw) };
-  } catch (e) { return defaultState(); }
-}
-function saveState() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+// ---------- State ----------
 function defaultState() {
   return {
     startDate: null,
-    days: {},
-    weights: [],
-    favorites: [],
-    shopping: {},
-    photos: [],
-    cheats: {},
-    person: {}
+    days: {},        // iso -> { meals:{slot:true}, extras:[{f,q}], water, workout, metformin, sleep, walks }
+    weights: [],     // { date, kg }
+    waists: [],      // { date, cm }
+    grocery: {},     // itemId -> true
+    prep: {},        // iso -> { taskIndex: true }
+    labels: {},      // foodId -> { kcal, p, c, f }
+    profile: {},     // { age, height, startWeight }
+    milestones: []
   };
 }
+function loadState() {
+  try {
+    const raw = lsGet(LS_KEY);
+    if (!raw) return defaultState();
+    return Object.assign(defaultState(), JSON.parse(raw));
+  } catch (e) { return defaultState(); }
+}
 let state = loadState();
+function save() { lsSet(LS_KEY, JSON.stringify(state)); }
 
-// Apply user overrides to PERSON (mutates the object — const forbids
-// rebinding, not mutation). Re-derive BMI from weight/height unless
-// the override explicitly sets one.
-function applyPersonOverrides() {
-  const o = state.person || {};
-  Object.keys(o).forEach(k => {
-    if (o[k] !== undefined && o[k] !== null && o[k] !== "") PERSON[k] = o[k];
-  });
-  if (PERSON.weight && PERSON.height && !("bmi" in o)) {
-    const m = PERSON.height / 100;
-    PERSON.bmi = +(PERSON.weight / (m * m)).toFixed(2);
-  }
+// ---------- Dates ----------
+function isoOf(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
-applyPersonOverrides();
+function parseIso(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
+function todayIso() { return isoOf(new Date()); }
+function addDays(iso, n) { const d = parseIso(iso); d.setDate(d.getDate() + n); return isoOf(d); }
+function daysBetween(a, b) { return Math.round((parseIso(b) - parseIso(a)) / 86400000); }
+function jsDay(iso) { return parseIso(iso).getDay(); }          // 0 = Sunday
+function planIdx(iso) { return (jsDay(iso) + 6) % 7; }           // 0 = Monday
+function mondayOf(iso) { return addDays(iso, -planIdx(iso)); }
 
-// ---------- Date helpers ----------
-function today() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-function daysBetween(a, b) {
-  return Math.round((new Date(b) - new Date(a)) / 86400000);
-}
 const AR_MONTHS = ["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
-const AR_DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
 const EN_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const EN_DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-function formatDate(iso) {
-  const d = new Date(iso);
-  const date = d.getDate();
-  const year = d.getFullYear();
-  if (lang === "en") {
-    return `${EN_DAYS[d.getDay()]}, ${date} ${EN_MONTHS[d.getMonth()]} ${year}`;
-  }
-  return `${AR_DAYS[d.getDay()]}، ${date} ${AR_MONTHS[d.getMonth()]} ${year}`;
-}
-function dayNumber() {
-  if (!state.startDate) return null;
-  return daysBetween(state.startDate, today()) + 1;
-}
-function ensureDay(iso) {
-  if (!state.days[iso]) {
-    state.days[iso] = { water: 0, meals: { breakfast:false, lunch:false, dinner:false, snack1:false, snack2:false } };
-  }
-  return state.days[iso];
+function monthName(m) { return (lang === "ar" ? AR_MONTHS : EN_MONTHS)[m]; }
+function formatDate(iso, withYear) {
+  const d = parseIso(iso);
+  return d.getDate() + " " + monthName(d.getMonth()) + (withYear === false ? "" : " " + d.getFullYear());
 }
 
-// ---------- Icon injection into tabs ----------
-function injectTabIcons() {
-  if (typeof ICONS === "undefined") return;
-  document.querySelectorAll(".tab[data-tab]").forEach(tab => {
-    const key = TAB_ICONS[tab.dataset.tab];
-    if (!key || !ICONS[key]) return;
-    const raw = tab.textContent.replace(/^[^\p{L}\p{N}]+/u, "").trim();
-    tab.innerHTML = ICONS[key] + '<span class="tab-label">' + raw + '</span>';
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-selected", tab.classList.contains("active") ? "true" : "false");
-    tab.setAttribute("aria-controls", tab.dataset.tab);
-    tab.setAttribute("aria-label", raw);
-  });
+if (!state.startDate) { state.startDate = todayIso(); save(); }
+let viewDate = todayIso();
+let planDay = planIdx(todayIso());
+let calMonth = todayIso().slice(0, 7);
+
+// ---------- Profile ----------
+function profile() {
+  const p = Object.assign({}, PROFILE);
+  Object.keys(state.profile || {}).forEach(k => { if (state.profile[k] != null && state.profile[k] !== "") p[k] = state.profile[k]; });
+  return p;
 }
 
-// ---------- Toast / celebration ----------
+// ---------- Nutrition ----------
+function food(id) { return Object.assign({}, FOODS[id], state.labels[id] || {}); }
+function itemMacros(it) {
+  const f = food(it.f);
+  const m = f.unit === "pc" ? it.q : it.q / 100;
+  return {
+    kcal: f.kcal * m, p: f.p * m, c: f.c * m, f: f.f * m, fib: f.fib * m,
+    veg: f.group === "veg" ? it.q : 0,
+    fruit: f.group === "fruit" ? (f.fruitPc ? it.q * f.fruitPc : it.q / f.fruitG) : 0
+  };
+}
+function sumMacros(items) {
+  const s = { kcal:0, p:0, c:0, f:0, fib:0, veg:0, fruit:0 };
+  items.forEach(it => { const m = itemMacros(it); Object.keys(s).forEach(k => { s[k] += m[k]; }); });
+  return s;
+}
+function qtyText(q, unit) {
+  if (unit === "pc") return String(q);
+  return q + " " + u(unit);
+}
+function itemText(it) {
+  const f = food(it.f);
+  const name = t(f.name);
+  if (it.noQty) return cap(name);
+  return qtyText(it.q, f.unit) + " " + name;
+}
+
+// ---------- Days ----------
+function emptyDay() { return { meals:{}, extras:[], water:0, workout:false, metformin:false, sleep:null, walks:0 }; }
+function getDay(iso) { return Object.assign(emptyDay(), state.days[iso] || {}); }
+function editDay(iso, fn) {
+  const d = getDay(iso);
+  fn(d);
+  state.days[iso] = d;
+  save();
+  if (iso === todayIso()) maybeCelebrate();
+  renderToday();
+}
+function planFor(iso) { return PLAN[planIdx(iso)]; }
+function workoutType(iso) { return WORKOUT.schedule[jsDay(iso)]; }
+
+function eatenItems(iso) {
+  const d = getDay(iso), p = planFor(iso);
+  const items = [];
+  SLOTS.forEach(s => { if (d.meals[s.key]) items.push(...p.meals[s.key].items); });
+  return items.concat(d.extras || []);
+}
+function plannedItems(iso) {
+  const d = getDay(iso), p = planFor(iso);
+  const items = [];
+  SLOTS.forEach(s => items.push(...p.meals[s.key].items));
+  return items.concat(d.extras || []);
+}
+
+function checklist(iso) {
+  const d = getDay(iso);
+  const tot = sumMacros(eatenItems(iso));
+  const T = TARGETS;
+  const waterMl = d.water * GLASS_ML;
+  const wt = workoutType(iso);
+  const range = (a, b, unit) => a + "-" + b + (unit ? " " + u(unit) : "");
+  return [
+    { key:"kcal", icon:"flame", met: tot.kcal >= T.kcal.min - 50 && tot.kcal <= T.kcal.max + 50,
+      val: Math.round(tot.kcal) + " / " + range(T.kcal.min, T.kcal.max) },
+    { key:"protein", icon:"fish", met: tot.p >= T.protein.min,
+      val: Math.round(tot.p) + " / " + range(T.protein.min, T.protein.max, "g") },
+    { key:"fiber", icon:"wheat", met: tot.fib >= T.fiber.min,
+      val: Math.round(tot.fib) + " / " + range(T.fiber.min, T.fiber.max, "g") },
+    { key:"water", icon:"droplet", met: waterMl >= T.waterMl.min,
+      val: num(waterMl / 1000, 2) + " / 2-2.5 " + u("L") },
+    { key:"veg", icon:"bowl", met: tot.veg >= T.vegG.min,
+      val: Math.round(tot.veg) + " / " + range(T.vegG.min, T.vegG.max, "g") },
+    { key:"fruit", icon:"apple", met: tot.fruit >= T.fruit.min - 0.05,
+      val: num(tot.fruit, 1) + " / " + T.fruit.min },
+    { key:"move", icon: WORKOUT.types[wt].icon, met: wt === "rest" || d.workout,
+      val: t(WORKOUT.types[wt].name) },
+    { key:"metformin", icon:"pill", met: !!d.metformin, val: d.metformin ? tUI("taken") : "" },
+    { key:"sleep", icon:"bed", met: d.sleep != null && d.sleep >= T.sleep.min && d.sleep <= T.sleep.max,
+      val: d.sleep != null ? num(d.sleep, 1) + " " + u("h") + " / 7-9" : tUI("sleep_unset") }
+  ];
+}
+function score(iso) { return checklist(iso).filter(c => c.met).length; }
+const GOOD_DAY = 7;
+
+function currentStreak() {
+  let iso = todayIso();
+  let n = 0;
+  if (score(iso) < GOOD_DAY) iso = addDays(iso, -1); // today still in progress
+  while (iso >= state.startDate && state.days[iso] && score(iso) >= GOOD_DAY) { n++; iso = addDays(iso, -1); }
+  return n;
+}
+
+// ---------- Toast / confetti ----------
 function toast(title, sub, variant) {
   const host = document.getElementById("toastHost");
-  if (!host) return;
   const el = document.createElement("div");
   el.className = "toast" + (variant ? " " + variant : "");
-  el.innerHTML = sub
-    ? `<div><div class="toast-title">${title}</div><div class="toast-sub">${sub}</div></div>`
-    : `<div class="toast-title">${title}</div>`;
+  el.innerHTML = '<div class="toast-title">' + esc(title) + "</div>" + (sub ? '<div class="toast-sub">' + esc(sub) + "</div>" : "");
   host.appendChild(el);
-  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3800);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3600);
 }
-
 function confettiBurst() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const host = document.getElementById("confettiHost");
-  if (!host) return;
-  const colors = ["#8B5CF6","#059669","#EC4899","#F59E0B","#6366F1","#10B981"];
-  const count = 80;
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < count; i++) {
+  const colors = ["#2F6B5A", "#E07A5F", "#F2CC8F", "#81B29A", "#3D405B"];
+  for (let i = 0; i < 70; i++) {
     const p = document.createElement("div");
     p.className = "confetti-piece";
-    const x = Math.random() * 100;
-    const dx = (Math.random() - 0.5) * 300;
-    const rot = (Math.random() - 0.5) * 1080;
     const dur = 2200 + Math.random() * 1400;
-    const delay = Math.random() * 240;
-    p.style.left = x + "vw";
-    p.style.setProperty("--dx", dx + "px");
-    p.style.setProperty("--rot", rot + "deg");
+    p.style.left = Math.random() * 100 + "vw";
+    p.style.setProperty("--dx", (Math.random() - 0.5) * 300 + "px");
+    p.style.setProperty("--rot", (Math.random() - 0.5) * 1080 + "deg");
     p.style.setProperty("--dur", dur + "ms");
-    p.style.animationDelay = delay + "ms";
     p.style.background = colors[i % colors.length];
     p.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
-    frag.appendChild(p);
-    setTimeout(() => p.remove(), dur + delay + 400);
+    host.appendChild(p);
+    setTimeout(() => p.remove(), dur + 400);
   }
-  host.appendChild(frag);
 }
-
-// ---------- Milestone detection ----------
-const MILESTONES = [3, 7, 14, 28];
-function maybeCelebrateStreak() {
+const MILESTONES = [3, 7, 14, 21, 30, 60, 90];
+function maybeCelebrate() {
   const s = currentStreak();
-  const seen = JSON.parse(localStorage.getItem("lynn-keto-milestones") || "[]");
-  if (MILESTONES.includes(s) && !seen.includes(s)) {
-    seen.push(s);
-    localStorage.setItem("lynn-keto-milestones", JSON.stringify(seen));
-    const title = t(UI["milestone_" + s + "_title"]);
-    const sub = t(UI["milestone_" + s + "_sub"]);
-    toast(title, sub, "celebrate");
+  if (MILESTONES.includes(s) && !state.milestones.includes(s)) {
+    state.milestones.push(s);
+    save();
+    toast(tUI("milestone", { n: s }), tUI("milestone_sub"), "celebrate");
     confettiBurst();
-    if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
   }
 }
 
-// ---------- Language switch ----------
-function applyLanguage() {
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === "en" ? "ltr" : "rtl";
-  document.title = lang === "en" ? "Keto Plan — Lynn Hamad" : "نظام الكيتو - Lynn Hamad";
-  document.getElementById("langToggle").textContent = t(UI.btn_lang);
-  // Apply static UI strings via data-i18n
-  document.querySelectorAll("[data-i18n]").forEach(el => {
-    const key = el.dataset.i18n;
-    if (UI[key]) el.textContent = t(UI[key]);
-  });
-  injectTabIcons();
-  document.querySelectorAll("[data-i18n-html]").forEach(el => {
-    const key = el.dataset.i18nHtml;
-    if (UI[key]) el.innerHTML = t(UI[key]);
-  });
-  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
-    const key = el.dataset.i18nPlaceholder;
-    if (UI[key]) el.placeholder = t(UI[key]);
-  });
-  renderAll();
-}
+// ---------- Small render helpers ----------
+const $ = id => document.getElementById(id);
+function icon(name) { return ICONS[name] || ""; }
+function rangeLabel(a, b) { return a === b ? String(a) : a + "-" + b; }
 
-// ---------- Tabs ----------
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => {
-      t.classList.remove("active");
-      t.setAttribute("aria-selected", "false");
-    });
-    document.querySelectorAll("section").forEach(s => s.classList.remove("active"));
-    tab.classList.add("active");
-    tab.setAttribute("aria-selected", "true");
-    document.getElementById(tab.dataset.tab).classList.add("active");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    if (tab.dataset.tab === "weight") renderWeightChart();
-    if (tab.dataset.tab === "calendar") renderCalendar();
-    if (tab.dataset.tab === "favorites") renderFavorites();
-    if (tab.dataset.tab === "cheats") renderCheatsTab();
-  });
-});
-function switchToTab(name) {
-  const tabEl = document.querySelector(`.tab[data-tab="${name}"]`);
-  if (tabEl) tabEl.click();
-}
-const MEAL_TAB_OF = { breakfast:"breakfast", lunch:"lunch", dinner:"dinner", snack1:"snacks", snack2:"snacks" };
-
-// ---------- TODAY ----------
+// ============================================================
+// TODAY
+// ============================================================
 function renderToday() {
-  const iso = today();
-  const dayData = ensureDay(iso);
+  const iso = viewDate;
+  const isToday = iso === todayIso();
+  const p = planFor(iso);
+  const d = getDay(iso);
 
-  document.getElementById("todayDate").textContent = formatDate(iso);
-  const n = dayNumber();
-  document.getElementById("statDay").textContent = n ? localizedNumber(n) : "—";
-  document.getElementById("dayBadge").textContent = n
-    ? tUI("dayBadge", { n: localizedNumber(n), total: localizedNumber(PERSON.durationDays) })
-    : t(UI.notStarted);
-  document.getElementById("statWater").textContent = `${localizedNumber(dayData.water)}/8`;
-  const mealCount = Object.values(dayData.meals).filter(Boolean).length;
-  document.getElementById("statMeals").textContent = `${localizedNumber(mealCount)}/5`;
-  document.getElementById("statStreak").textContent = `${localizedNumber(currentStreak())} 🔥`;
+  $("dayWeekday").textContent = isToday ? tUI("today") + " · " + t(p.day) : t(p.day);
+  $("dayDate").textContent = formatDate(iso);
+  $("nextDay").disabled = isToday;
+  $("prevDay").disabled = iso <= state.startDate;
+  $("pastBanner").hidden = isToday;
 
-  const cheatsToday = (state.cheats[iso] || []).length;
-  const cheatTile = document.getElementById("cheatStatTile");
-  document.getElementById("statCheats").textContent = localizedNumber(cheatsToday);
-  if (cheatTile) cheatTile.classList.toggle("has-cheats", cheatsToday > 0);
+  // Score ring + checklist
+  const ck = checklist(iso);
+  const met = ck.filter(c => c.met).length;
+  $("scoreNum").textContent = met;
+  $("ringFg").style.strokeDasharray = (met / ck.length * 100).toFixed(1) + " 100";
+  $("scoreTitle").textContent = tUI("goals_met", { n: met, t: ck.length });
+  const st = currentStreak();
+  $("streakText").textContent = st > 0 ? tUI("streak", { n: st }) + " · " + tUI("streak_hint") : tUI("streak_hint");
+  $("checklist").innerHTML = ck.map(c =>
+    '<div class="ck' + (c.met ? " met" : "") + '"><span class="ck-icon">' + (c.met ? icon("tick") : icon(c.icon)) + "</span>" +
+    '<span class="ck-body"><span class="ck-label">' + esc(tUI("ck_" + c.key)) + "</span>" +
+    '<span class="ck-val"><bdi>' + esc(c.val) + "</bdi></span></span></div>"
+  ).join("");
 
-  const dayScore = mealCount + (dayData.water >= 8 ? 1 : 0);
-  document.getElementById("dayProgress").style.width = ((dayScore/6)*100) + "%";
-
-  // Water cups
-  const wt = document.getElementById("waterTracker");
-  wt.innerHTML = "";
-  for (let i = 1; i <= 8; i++) {
-    const cup = document.createElement("button");
-    cup.type = "button";
-    cup.className = "water-cup" + (i <= dayData.water ? " filled" : "");
-    cup.setAttribute("aria-label", `Cup ${i} of 8`);
-    cup.setAttribute("aria-pressed", i <= dayData.water ? "true" : "false");
-    cup.addEventListener("click", () => {
-      dayData.water = dayData.water >= i ? i - 1 : i;
-      saveState(); renderToday(); maybeCelebrateStreak();
-    });
-    wt.appendChild(cup);
-  }
+  // Prep day card
+  const prep = PREP.find(x => x.weekday === jsDay(iso));
+  const prepEl = $("todayPrep");
+  if (prep) {
+    prepEl.hidden = false;
+    prepEl.innerHTML = '<h3>' + icon("clipboard") + esc(tUI("prep_today")) + ": " + esc(t(prep.title)) + "</h3>" + prepListHtml(prep, iso);
+  } else prepEl.hidden = true;
 
   // Meals
-  const mealOrder = [
-    ["breakfast","sunrise","meal_breakfast"],
-    ["snack1","droplet","meal_snack1"],
-    ["lunch","bowl","meal_lunch"],
-    ["snack2","cookie","meal_snack2"],
-    ["dinner","moon","meal_dinner"]
+  $("mealsHeader").textContent = isToday ? tUI("meals") : tUI("meals_of", { day: t(p.day) });
+  $("todayMeals").innerHTML = SLOTS.map(s => {
+    const meal = p.meals[s.key];
+    const m = sumMacros(meal.items);
+    const done = !!d.meals[s.key];
+    return '<button type="button" class="meal' + (done ? " done" : "") + '" data-slot="' + s.key + '" aria-pressed="' + done + '">' +
+      '<span class="meal-icon">' + (done ? icon("tick") : icon(s.icon)) + "</span>" +
+      '<span class="meal-body">' +
+        '<span class="meal-head"><span class="meal-name">' + esc(t(s.name)) + (meal.title ? " · " + esc(t(meal.title)) : "") + "</span>" +
+        '<span class="meal-kcal"><bdi>≈ ' + Math.round(m.kcal) + " " + u("kcal") + "</bdi></span></span>" +
+        '<span class="meal-items">' + meal.items.map(it => "<span>" + esc(itemText(it)) + "</span>").join("") + "</span>" +
+        '<span class="meal-foot">' + esc(tUI("meal_target", { a: s.kcal[0], b: s.kcal[1] })) + " · " +
+          esc(Math.round(m.p) + " " + u("g") + " " + tUI("ck_protein").toLowerCase()) +
+          '<span class="meal-state">' + esc(done ? tUI("mark_eaten") + " ✓" : tUI("tap_to_mark")) + "</span></span>" +
+      "</span></button>";
+  }).join("");
+
+  // Water
+  let w = "";
+  for (let i = 1; i <= GLASSES; i++) {
+    w += '<button type="button" class="glass' + (i <= d.water ? " full" : "") + (i * GLASS_ML === TARGETS.waterMl.min ? " goal" : "") +
+      '" data-glass="' + i + '" aria-label="' + i * GLASS_ML + ' ml"><span class="glass-fill"></span></button>';
+  }
+  $("waterRow").innerHTML = w;
+  $("waterLabel").innerHTML = "<bdi>" + num(d.water * GLASS_ML / 1000, 2) + " " + u("L") + "</bdi>";
+
+  // Habits
+  const wt = workoutType(iso);
+  const wtInfo = WORKOUT.types[wt];
+  let h = '<div class="habit"><span class="habit-icon">' + icon(wtInfo.icon) + '</span><span class="habit-body"><span class="habit-name">' +
+    esc(tUI("workout_today")) + ": " + esc(t(wtInfo.name)) + '</span><span class="habit-sub">' +
+    esc(wt === "rest" ? tUI("rest_day") : (wt === "workout" ? t(WORKOUT.name) : tUI("walks_sub"))) + "</span></span>";
+  if (wt !== "rest") h += '<button type="button" class="toggle' + (d.workout ? " on" : "") + '" data-habit="workout">' + esc(d.workout ? tUI("done") : tUI("mark_done")) + "</button>";
+  h += "</div>";
+  h += '<div class="habit"><span class="habit-icon">' + icon("pill") + '</span><span class="habit-body"><span class="habit-name">' +
+    esc(tUI("metformin")) + '</span><span class="habit-sub">' + esc(tUI("metformin_sub")) + "</span></span>" +
+    '<button type="button" class="toggle' + (d.metformin ? " on" : "") + '" data-habit="metformin">' + esc(d.metformin ? tUI("taken") : tUI("mark_taken")) + "</button></div>";
+  h += '<div class="habit"><span class="habit-icon">' + icon("bed") + '</span><span class="habit-body"><span class="habit-name">' +
+    esc(tUI("sleep")) + '</span><span class="habit-sub">7-9 ' + esc(tUI("hours")) + "</span></span>" +
+    stepper("sleep", d.sleep == null ? tUI("sleep_unset") : num(d.sleep, 1) + " " + u("h")) + "</div>";
+  h += '<div class="habit"><span class="habit-icon">' + icon("footprints") + '</span><span class="habit-body"><span class="habit-name">' +
+    esc(tUI("walks")) + '</span><span class="habit-sub">' + esc(tUI("walks_sub")) + "</span></span>" +
+    stepper("walks", String(d.walks || 0)) + "</div>";
+  $("habits").innerHTML = h;
+
+  // Nutrition
+  const tot = sumMacros(eatenItems(iso));
+  const bars = [
+    ["ck_kcal", tot.kcal, TARGETS.kcal, "kcal"],
+    ["ck_protein", tot.p, TARGETS.protein, "g"],
+    ["carbs", tot.c, TARGETS.carbs, "g"],
+    ["fat", tot.f, TARGETS.fat, "g"],
+    ["ck_fiber", tot.fib, TARGETS.fiber, "g"]
   ];
-  const mealsDiv = document.getElementById("todayMeals");
-  mealsDiv.innerHTML = "";
-  mealOrder.forEach(([key, iconKey, uiKey]) => {
-    const done = dayData.meals[key];
-    const row = document.createElement("div");
-    row.className = "meal-check clickable" + (done ? " done" : "");
-    row.setAttribute("role", "link");
-    row.setAttribute("tabindex", "0");
-    row.setAttribute("aria-label", t(UI[uiKey]));
-    row.innerHTML = `
-      <span class="meal-icon">${ICONS[iconKey] || ""}</span>
-      <div class="meal-body">
-        <div class="meal-title">${t(UI[uiKey])}</div>
-        <div class="meal-sub">${done ? t(UI.meal_done) : t(UI.meal_not_done)}</div>
-      </div>
-      <div class="meal-actions">
-        <button class="btn-sm" data-random="${key}" aria-label="${t(UI.pick_for_me)}">🎲</button>
-        <button class="btn-sm ${done ? "" : "success"}" data-toggle="${key}" aria-pressed="${done}">${done ? t(UI.btn_undo) : t(UI.btn_done)}</button>
-      </div>
-    `;
-    row.addEventListener("click", (e) => {
-      if (e.target.closest("[data-toggle], [data-random]")) return;
-      switchToTab(MEAL_TAB_OF[key]);
-    });
-    row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        if (e.target.closest("[data-toggle], [data-random]")) return;
-        e.preventDefault();
-        switchToTab(MEAL_TAB_OF[key]);
+  $("nutritionBars").innerHTML = bars.map(([k, v, T, unit]) => {
+    const scale = T.max * 1.15;
+    const st = v < T.min ? "under" : (v > T.max ? "over" : "ok");
+    return '<div class="nbar ' + st + '"><div class="nbar-head"><span>' + esc(tUI(k)) + '</span><bdi>' + Math.round(v) + " / " +
+      rangeLabel(T.min, T.max) + " " + esc(u(unit)) + "</bdi></div>" +
+      '<div class="nbar-track"><div class="nbar-zone" style="inset-inline-start:' + (T.min / scale * 100) + "%;width:" + ((T.max - T.min) / scale * 100) + '%"></div>' +
+      '<div class="nbar-fill" style="width:' + Math.min(100, v / scale * 100) + '%"></div></div></div>';
+  }).join("");
+
+  const planned = sumMacros(plannedItems(iso));
+  let msg = "";
+  if (planned.kcal < TARGETS.kcal.min - 50) msg += '<div class="note warn">' + esc(tUI("short_kcal", { n: Math.round(TARGETS.kcal.min - planned.kcal) })) + "</div>";
+  else if (tot.kcal > TARGETS.kcal.max + 50) msg += '<div class="note warn">' + esc(tUI("over_kcal", { n: Math.round(tot.kcal - TARGETS.kcal.max) })) + "</div>";
+  if (planned.p < TARGETS.protein.min) msg += '<div class="note warn">' + esc(tUI("short_protein", { n: Math.round(TARGETS.protein.min - planned.p) })) + "</div>";
+  $("nutritionMsg").innerHTML = msg;
+
+  // Extras
+  $("extrasList").innerHTML = (d.extras || []).length
+    ? (d.extras || []).map((it, i) => '<div class="row"><span>' + esc(itemText(it)) + ' <span class="muted"><bdi>≈ ' + Math.round(itemMacros(it).kcal) + " " + u("kcal") +
+        '</bdi></span></span><button type="button" class="icon-btn sm" data-extra-del="' + i + '" aria-label="' + esc(tUI("remove")) + '">' + icon("x") + "</button></div>").join("")
+    : '<p class="hint">' + esc(tUI("extras_none")) + "</p>";
+}
+
+function stepper(key, label) {
+  return '<span class="stepper"><button type="button" class="icon-btn sm" data-step="' + key + '" data-dir="-1" aria-label="-">' + icon("minus") +
+    '</button><span class="stepper-val"><bdi>' + esc(label) + '</bdi></span><button type="button" class="icon-btn sm" data-step="' + key + '" data-dir="1" aria-label="+">' + icon("plus") + "</button></span>";
+}
+
+function extraOptions() {
+  const groups = SWAPS.map(g => ({ title: t(g.title), items: g.items.map(it => ({ f: it.f, q: it.q })) }));
+  groups.push({ title: tUI("veg_title"), items: [{ f: "veg", q: 100 }, { f: "salad", q: 150 }] });
+  return groups;
+}
+function renderExtraSelect() {
+  $("extraSelect").innerHTML = extraOptions().map(g =>
+    '<optgroup label="' + esc(g.title) + '">' + g.items.map(it =>
+      '<option value="' + it.f + ":" + it.q + '">' + esc(itemText(it)) + " (≈ " + Math.round(itemMacros(it).kcal) + " " + u("kcal") + ")</option>"
+    ).join("") + "</optgroup>").join("");
+  $("extraNote").textContent = t(EXTRA_NOTE);
+}
+
+function bindToday() {
+  $("todayMeals").addEventListener("click", e => {
+    const b = e.target.closest("[data-slot]");
+    if (!b) return;
+    editDay(viewDate, d => { d.meals[b.dataset.slot] = !d.meals[b.dataset.slot]; });
+  });
+  $("waterRow").addEventListener("click", e => {
+    const b = e.target.closest("[data-glass]");
+    if (!b) return;
+    const n = +b.dataset.glass;
+    editDay(viewDate, d => { d.water = d.water === n ? n - 1 : n; });
+  });
+  $("habits").addEventListener("click", e => {
+    const tg = e.target.closest("[data-habit]");
+    if (tg) { const k = tg.dataset.habit; editDay(viewDate, d => { d[k] = !d[k]; }); return; }
+    const sb = e.target.closest("[data-step]");
+    if (!sb) return;
+    const dir = +sb.dataset.dir;
+    if (sb.dataset.step === "sleep") {
+      editDay(viewDate, d => {
+        if (d.sleep == null) { d.sleep = dir > 0 ? 7 : null; return; }
+        const v = d.sleep + dir * 0.5;
+        d.sleep = v < 0 ? null : Math.min(14, v);
+      });
+    } else {
+      editDay(viewDate, d => { d.walks = Math.max(0, Math.min(5, (d.walks || 0) + dir)); });
+    }
+  });
+  $("extraAdd").addEventListener("click", () => {
+    const [f, q] = $("extraSelect").value.split(":");
+    editDay(viewDate, d => { d.extras = (d.extras || []).concat([{ f, q: +q }]); });
+  });
+  $("extrasList").addEventListener("click", e => {
+    const b = e.target.closest("[data-extra-del]");
+    if (!b) return;
+    editDay(viewDate, d => { d.extras.splice(+b.dataset.extraDel, 1); });
+  });
+  $("todayPrep").addEventListener("change", onPrepChange);
+  $("prevDay").addEventListener("click", () => { viewDate = addDays(viewDate, -1); renderToday(); });
+  $("nextDay").addEventListener("click", () => { if (viewDate < todayIso()) { viewDate = addDays(viewDate, 1); renderToday(); } });
+  $("backToday").addEventListener("click", () => { viewDate = todayIso(); renderToday(); });
+}
+
+// ============================================================
+// PLAN
+// ============================================================
+function mealCardHtml(slot, meal) {
+  const m = sumMacros(meal.items);
+  const inRange = m.kcal >= slot.kcal[0] - 25 && m.kcal <= slot.kcal[1] + 25;
+  return '<div class="card plan-meal"><div class="card-head"><h3><span class="h-icon">' + icon(slot.icon) + "</span>" + esc(t(slot.name)) +
+    (meal.title ? ' <span class="muted">· ' + esc(t(meal.title)) + "</span>" : "") + '</h3><span class="pill' + (inRange ? " ok" : "") + '"><bdi>≈ ' +
+    Math.round(m.kcal) + " " + u("kcal") + "</bdi></span></div>" +
+    '<ul class="bullets">' + meal.items.map(it => "<li>" + esc(itemText(it)) + "</li>").join("") + "</ul>" +
+    '<p class="hint">' + esc(tUI("meal_target", { a: slot.kcal[0], b: slot.kcal[1] })) + " · " +
+    "<bdi>" + Math.round(m.p) + " " + u("g") + "</bdi> " + esc(tUI("ck_protein").toLowerCase()) + "</p></div>";
+}
+function totalsTableHtml(tot) {
+  const rows = [
+    ["ck_kcal", tot.kcal, TARGETS.kcal, "kcal"],
+    ["ck_protein", tot.p, TARGETS.protein, "g"],
+    ["carbs", tot.c, TARGETS.carbs, "g"],
+    ["fat", tot.f, TARGETS.fat, "g"],
+    ["ck_fiber", tot.fib, TARGETS.fiber, "g"]
+  ];
+  return '<table><thead><tr><th>' + esc(tUI("col_nutrient")) + "</th><th>≈</th><th>" + esc(tUI("col_target")) + "</th></tr></thead><tbody>" +
+    rows.map(([k, v, T, unit]) => {
+      const st = v < T.min ? "under" : (v > T.max ? "over" : "ok");
+      return '<tr class="' + st + '"><td>' + esc(tUI(k)) + "</td><td><bdi>" + Math.round(v) + "</bdi></td><td><bdi>" + rangeLabel(T.min, T.max) + " " + esc(u(unit)) + "</bdi></td></tr>";
+    }).join("") + "</tbody></table>";
+}
+function renderPlan() {
+  $("planDays").innerHTML = PLAN.map((p, i) =>
+    '<button type="button" class="chip' + (i === planDay ? " active" : "") + (i === planIdx(todayIso()) ? " is-today" : "") +
+    '" data-day="' + i + '" role="tab" aria-selected="' + (i === planDay) + '">' + esc(t(p.day)) + "</button>").join("");
+  const p = PLAN[planDay];
+  $("planMeals").innerHTML = SLOTS.map(s => mealCardHtml(s, p.meals[s.key])).join("");
+  const items = [];
+  SLOTS.forEach(s => items.push(...p.meals[s.key].items));
+  $("planTotals").innerHTML = totalsTableHtml(sumMacros(items));
+  $("planNote").textContent = t(PLAN_NOTE);
+  $("portionRules").textContent = t(PORTION_RULES);
+}
+
+// ============================================================
+// SWAPS
+// ============================================================
+function renderSwaps() {
+  const groups = SWAPS.map(g => {
+    const rows = g.items.map(it => {
+      const f = food(it.f);
+      const m = itemMacros(it);
+      const portion = it.medium
+        ? it.q + " " + tUI("medium")
+        : (it.range || it.q) + " " + u(f.unit);
+      const pick = it.range && String(it.range) !== String(it.q) ? ' <span class="muted">(' + it.q + " " + u(f.unit) + ")</span>" : "";
+      return "<tr><td>" + esc(cap(t(f.name))) + "</td><td><bdi>" + esc(portion) + "</bdi>" + pick + "</td><td><bdi>" + Math.round(m.kcal) + "</bdi></td></tr>";
+    }).join("");
+    return '<div class="card"><h3><span class="h-icon">' + icon(g.icon) + "</span>" + esc(t(g.title)) + "</h3>" +
+      '<p class="hint">' + esc(t(g.sub)) + "</p>" +
+      "<table><thead><tr><th>" + esc(tUI("col_food")) + "</th><th>" + esc(tUI("col_portion")) + "</th><th>" + esc(tUI("col_kcal")) + "</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+      (g.notes ? g.notes.map(n => '<div class="note">' + esc(t(n)) + "</div>").join("") : "") + "</div>";
+  });
+  groups.push('<div class="card"><h3><span class="h-icon">' + icon("bowl") + "</span>" + esc(tUI("veg_title")) + "</h3>" +
+    '<p class="hint">' + esc(t(VEG_NOTE)) + '</p><div class="pills">' + VEG_FREE.map(v => '<span class="pill">' + esc(t(v)) + "</span>").join("") + "</div></div>");
+  $("swapGroups").innerHTML = groups.join("");
+}
+
+// ============================================================
+// SHOP & PREP
+// ============================================================
+function prepDateFor(prep, fromIso) {
+  // most recent occurrence of prep.weekday on or before fromIso
+  const back = (jsDay(fromIso) - prep.weekday + 7) % 7;
+  return addDays(fromIso, -back);
+}
+function prepListHtml(prep, iso) {
+  const done = state.prep[iso] || {};
+  return '<div class="checks">' + prep.tasks.map((task, i) => {
+    const id = "prep-" + iso + "-" + i;
+    return '<label class="check' + (done[i] ? " on" : "") + '" for="' + id + '"><input type="checkbox" id="' + id + '" data-prep="' + iso + '" data-idx="' + i + '"' +
+      (done[i] ? " checked" : "") + "><span>" + esc(t(task)) + "</span></label>";
+  }).join("") + "</div>";
+}
+function onPrepChange(e) {
+  const cb = e.target.closest("[data-prep]");
+  if (!cb) return;
+  const iso = cb.dataset.prep;
+  state.prep[iso] = state.prep[iso] || {};
+  if (cb.checked) state.prep[iso][cb.dataset.idx] = true; else delete state.prep[iso][cb.dataset.idx];
+  save();
+  renderShop();
+  renderToday();
+}
+function renderShop() {
+  let total = 0, have = 0;
+  $("groceryList").innerHTML = GROCERY.map(g => {
+    return '<div class="shop-group"><h4>' + esc(t(g.title)) + "</h4>" + (g.note ? '<p class="hint">' + esc(t(g.note)) + "</p>" : "") +
+      '<div class="checks">' + g.items.map(it => {
+        total++;
+        const on = !!state.grocery[it.id];
+        if (on) have++;
+        return '<label class="check' + (on ? " on" : "") + '" for="' + it.id + '"><input type="checkbox" id="' + it.id + '" data-grocery="' + it.id + '"' + (on ? " checked" : "") + ">" +
+          "<span>" + esc(t(it.name)) + (it.qty ? ' <span class="muted"><bdi>' + esc(t(it.qty)) + "</bdi></span>" : "") + "</span></label>";
+      }).join("") + "</div></div>";
+  }).join("");
+  $("groceryCount").textContent = tUI("grocery_progress", { n: have, t: total });
+  $("groceryFill").style.width = (have / total * 100) + "%";
+
+  const now = todayIso();
+  $("prepLists").innerHTML = PREP.map(prep => {
+    const iso = prepDateFor(prep, now);
+    return '<div class="shop-group"><h4>' + esc(tUI("prep_for", { day: t(prep.title), date: formatDate(iso, false) })) + "</h4>" + prepListHtml(prep, iso) + "</div>";
+  }).join("");
+  $("prepNote").textContent = t(PREP_NOTE);
+}
+function bindShop() {
+  $("groceryList").addEventListener("change", e => {
+    const cb = e.target.closest("[data-grocery]");
+    if (!cb) return;
+    if (cb.checked) state.grocery[cb.dataset.grocery] = true; else delete state.grocery[cb.dataset.grocery];
+    save();
+    renderShop();
+  });
+  $("prepLists").addEventListener("change", onPrepChange);
+  $("groceryReset").addEventListener("click", () => {
+    if (!confirm(tUI("new_week_confirm"))) return;
+    state.grocery = {};
+    save();
+    renderShop();
+  });
+}
+
+// ============================================================
+// MOVE
+// ============================================================
+function renderMove() {
+  $("workoutName").innerHTML = '<span class="h-icon">' + icon("dumbbell") + "</span>" + esc(t(WORKOUT.name));
+  $("workoutLink").innerHTML = esc(tUI("open_video")) + " " + icon("external");
+  $("workoutLink").href = WORKOUT.link;
+  const mon = mondayOf(todayIso());
+  let planned = 0, doneN = 0;
+  $("weekStrip").innerHTML = PLAN.map((p, i) => {
+    const iso = addDays(mon, i);
+    const type = workoutType(iso);
+    const d = getDay(iso);
+    if (type === "workout") { planned++; if (d.workout) doneN++; }
+    const future = iso > todayIso();
+    const done = type !== "rest" && d.workout;
+    const clickable = type !== "rest" && !future;
+    return '<button type="button" class="wday ' + type + (done ? " done" : "") + (iso === todayIso() ? " today" : "") + (future ? " future" : "") +
+      '"' + (clickable ? ' data-wday="' + iso + '"' : " disabled") + ">" +
+      '<span class="wday-name">' + esc(t(p.day).slice(0, lang === "ar" ? 10 : 3)) + "</span>" +
+      '<span class="wday-icon">' + (done ? icon("tick") : icon(WORKOUT.types[type].icon)) + "</span>" +
+      '<span class="wday-type">' + esc(t(WORKOUT.types[type].name).split(" / ")[0]) + "</span></button>";
+  }).join("");
+  $("weekCount").textContent = tUI("this_week", { n: doneN, t: planned });
+  $("workoutNotes").innerHTML = WORKOUT.notes.map(n => "<li>" + esc(t(n)) + "</li>").join("");
+}
+function bindMove() {
+  $("weekStrip").addEventListener("click", e => {
+    const b = e.target.closest("[data-wday]");
+    if (!b) return;
+    const iso = b.dataset.wday;
+    const d = getDay(iso);
+    d.workout = !d.workout;
+    state.days[iso] = d;
+    save();
+    renderMove();
+    renderToday();
+  });
+}
+
+// ============================================================
+// PROGRESS
+// ============================================================
+const charts = {};
+function sortedEntries(arr) { return arr.slice().sort((a, b) => a.date.localeCompare(b.date)); }
+function renderProgress() {
+  const pr = profile();
+  const ws = sortedEntries(state.weights);
+  const zs = sortedEntries(state.waists);
+  const cur = ws.length ? ws[ws.length - 1].kg : null;
+  const delta = cur != null ? cur - pr.startWeight : null;
+  const lastWaist = zs.length ? zs[zs.length - 1] : null;
+  const waistDelta = zs.length > 1 ? zs[zs.length - 1].cm - zs[0].cm : null;
+  let next;
+  if (!lastWaist) next = tUI("waist_first");
+  else {
+    const age = daysBetween(lastWaist.date, todayIso());
+    if (age >= PROGRESS.waistOverdueDays) next = tUI("waist_overdue");
+    else if (age >= PROGRESS.waistDueDays) next = tUI("waist_due_now");
+    else next = tUI("waist_in", { n: PROGRESS.waistDueDays - age });
+  }
+  const sign = v => (v > 0 ? "+" : "") + num(v, 1);
+  const stat = (lbl, val, cls) => '<div class="stat' + (cls ? " " + cls : "") + '"><span class="stat-val"><bdi>' + esc(val) + '</bdi></span><span class="stat-lbl">' + esc(lbl) + "</span></div>";
+  $("progressStats").innerHTML =
+    stat(tUI("start_w"), num(pr.startWeight, 1) + " " + u("kg")) +
+    stat(tUI("current_w"), cur != null ? num(cur, 1) + " " + u("kg") : "-") +
+    stat(tUI("change"), delta != null ? sign(delta) + " " + u("kg") : "-", delta != null && delta < 0 ? "good" : "") +
+    stat(tUI("waist_last"), lastWaist ? num(lastWaist.cm, 1) + " " + u("cm") : "-") +
+    stat(tUI("waist_change"), waistDelta != null ? sign(waistDelta) + " " + u("cm") : "-", waistDelta != null && waistDelta < 0 ? "good" : "") +
+    stat(tUI("waist_next"), next, lastWaist && daysBetween(lastWaist.date, todayIso()) >= PROGRESS.waistDueDays ? "due" : "");
+  $("waistNote").textContent = t(PROGRESS.note);
+
+  const listHtml = (arr, key, unit, kind) => arr.length
+    ? arr.slice().reverse().map(e => '<div class="row"><span>' + esc(formatDate(e.date)) + '</span><span class="row-end"><bdi>' + num(e[key], 1) + " " + u(unit) +
+        '</bdi><button type="button" class="icon-btn sm" data-del-' + kind + '="' + e.date + '" aria-label="' + esc(tUI("remove")) + '">' + icon("trash") + "</button></span></div>").join("")
+    : '<p class="hint">' + esc(tUI("no_entries")) + "</p>";
+  $("weightEntries").innerHTML = listHtml(ws, "kg", "kg", "weight");
+  $("waistEntries").innerHTML = listHtml(zs, "cm", "cm", "waist");
+  if ($("progress").classList.contains("active")) renderCharts();
+}
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function renderCharts() {
+  if (typeof Chart === "undefined") return;
+  const draw = (id, arr, key, color) => {
+    const pts = sortedEntries(arr);
+    if (charts[id]) charts[id].destroy();
+    const canvas = $(id);
+    canvas.parentElement.hidden = pts.length < 2;
+    if (pts.length < 2) return;
+    charts[id] = new Chart(canvas, {
+      type: "line",
+      data: { labels: pts.map(e => formatDate(e.date, false)), datasets: [{ data: pts.map(e => e[key]), borderColor: color, backgroundColor: color, tension: 0.3, pointRadius: 3, borderWidth: 2 }] },
+      options: {
+        maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { reverse: lang === "ar", ticks: { color: cssVar("--muted") }, grid: { display: false } },
+          y: { position: lang === "ar" ? "right" : "left", ticks: { color: cssVar("--muted") }, grid: { color: cssVar("--divider") } }
+        }
       }
     });
-    mealsDiv.appendChild(row);
+  };
+  draw("weightChart", state.weights, "kg", cssVar("--primary"));
+  draw("waistChart", state.waists, "cm", cssVar("--accent"));
+}
+function upsertEntry(arr, date, key, value) {
+  const i = arr.findIndex(e => e.date === date);
+  const e = { date }; e[key] = value;
+  if (i >= 0) arr[i] = e; else arr.push(e);
+}
+function bindProgress() {
+  $("weightDate").value = todayIso();
+  $("waistDate").value = todayIso();
+  $("addWeight").addEventListener("click", () => {
+    const v = parseFloat($("weightInput").value);
+    const date = $("weightDate").value || todayIso();
+    if (!(v > 20 && v < 300)) return;
+    upsertEntry(state.weights, date, "kg", v);
+    save(); $("weightInput").value = ""; renderProgress(); toast(tUI("saved"));
   });
-  mealsDiv.querySelectorAll("[data-toggle]").forEach(b => {
-    b.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const k = b.dataset.toggle;
-      dayData.meals[k] = !dayData.meals[k];
-      saveState(); renderToday(); renderCalendar(); maybeCelebrateStreak();
-    });
+  $("addWaist").addEventListener("click", () => {
+    const v = parseFloat($("waistInput").value);
+    const date = $("waistDate").value || todayIso();
+    if (!(v > 30 && v < 250)) return;
+    upsertEntry(state.waists, date, "cm", v);
+    save(); $("waistInput").value = ""; renderProgress(); toast(tUI("saved"));
   });
-  mealsDiv.querySelectorAll("[data-random]").forEach(b => {
-    b.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openRandom(b.dataset.random);
-    });
-  });
-
-  const cheatTileEl = document.getElementById("cheatStatTile");
-  if (cheatTileEl && !cheatTileEl.dataset.bound) {
-    cheatTileEl.dataset.bound = "1";
-    cheatTileEl.style.cursor = "pointer";
-    cheatTileEl.setAttribute("role", "link");
-    cheatTileEl.setAttribute("tabindex", "0");
-    cheatTileEl.addEventListener("click", () => switchToTab("cheats"));
-    cheatTileEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchToTab("cheats"); }
-    });
-  }
-}
-function currentStreak() {
-  if (!state.startDate) return 0;
-  let streak = 0;
-  let d = new Date(today());
-  while (true) {
-    const iso = d.toISOString().slice(0,10);
-    const dd = state.days[iso];
-    if (!dd) break;
-    const count = Object.values(dd.meals).filter(Boolean).length;
-    if (count >= 3 && dd.water >= 6) streak++;
-    else break;
-    d.setDate(d.getDate() - 1);
-  }
-  return streak;
-}
-
-// ---------- MEAL LISTS ----------
-function renderMealList(containerId, meals) {
-  const c = document.getElementById(containerId);
-  c.innerHTML = "";
-  meals.forEach(m => {
-    const fav = state.favorites.includes(m.id);
-    const div = document.createElement("div");
-    div.className = "option" + (fav ? " fav" : "");
-    const title = m.title ? ` — ${t(m.title)}` : "";
-    div.innerHTML = `
-      <div class="option-header">
-        <div class="option-title">${t(UI.option_label)} ${t(m.num)}${title}</div>
-        <button class="fav-btn ${fav ? "active" : ""}" data-fav="${m.id}" aria-label="${t(UI.fav_header)}" aria-pressed="${fav}">${fav ? ICONS.heartFilled : ICONS.heart}</button>
-      </div>
-      <div class="option-body">
-        <ul>${m.items.map(x => `<li>${t(x)}</li>`).join("")}</ul>
-        ${m.note ? `<div class="note">${t(m.note)}</div>` : ""}
-      </div>
-    `;
-    c.appendChild(div);
-  });
-  c.querySelectorAll("[data-fav]").forEach(b => {
-    b.addEventListener("click", () => {
-      const id = b.dataset.fav;
-      const idx = state.favorites.indexOf(id);
-      if (idx === -1) state.favorites.push(id);
-      else state.favorites.splice(idx, 1);
-      saveState();
-      renderAllMealLists();
-      renderFavorites();
-    });
-  });
-}
-function renderAllMealLists() {
-  renderMealList("breakfastList", BREAKFAST);
-  renderMealList("lunchList", LUNCH);
-  renderMealList("dinnerList", DINNER);
-  renderMealList("snack1List", SNACK1);
-  renderMealList("snack2List", SNACK2);
-}
-
-// ---------- Random picker ----------
-const MEAL_POOL = { breakfast: BREAKFAST, lunch: LUNCH, dinner: DINNER, snack1: SNACK1, snack2: SNACK2 };
-const MEAL_LABEL_KEY = { breakfast:"meal_breakfast", lunch:"meal_lunch", dinner:"meal_dinner", snack1:"meal_snack1", snack2:"meal_snack2" };
-const MEAL_ICON = { breakfast:"🍳", lunch:"🍽️", dinner:"🌙", snack1:"🥤", snack2:"🥜" };
-let currentRandomCategory = null;
-
-function openRandom(cat) {
-  currentRandomCategory = cat;
-  document.getElementById("modalPickAgain").style.display = "";
-  pickRandom();
-  document.getElementById("modal").classList.add("show");
-}
-function pickRandom() {
-  const pool = MEAL_POOL[currentRandomCategory];
-  const pick = pool[Math.floor(Math.random() * pool.length)];
-  const label = `${MEAL_ICON[currentRandomCategory]} ${t(UI[MEAL_LABEL_KEY[currentRandomCategory]])}`;
-  const titleStr = pick.title ? t(pick.title) : `${t(UI.option_label)} ${t(pick.num)}`;
-  document.getElementById("modalTitle").textContent = `${label} — ${titleStr}`;
-  document.getElementById("modalBody").innerHTML = `
-    <ul style="padding-inline-start:18px">${pick.items.map(x => `<li style="margin-bottom:4px">${t(x)}</li>`).join("")}</ul>
-    ${pick.note ? `<div class="note">${t(pick.note)}</div>` : ""}
-  `;
-}
-document.getElementById("modalClose").addEventListener("click", () => {
-  document.getElementById("modal").classList.remove("show");
-});
-document.getElementById("modalPickAgain").addEventListener("click", pickRandom);
-document.getElementById("modal").addEventListener("click", (e) => {
-  if (e.target.id === "modal") e.target.classList.remove("show");
-});
-
-// ---------- SHOPPING ----------
-function renderShopping() {
-  const c = document.getElementById("shoppingList");
-  c.innerHTML = "";
-  SHOPPING.forEach(category => {
-    const div = document.createElement("div");
-    div.className = "shop-category";
-    div.innerHTML = `<h4>${t(category.title)}</h4>`;
-    category.items.forEach(item => {
-      const key = item.ar; // stable across languages
-      const checked = !!state.shopping[key];
-      const wrap = document.createElement("div");
-      wrap.className = "checkbox-wrap";
-      const id = "shop-" + btoa(unescape(encodeURIComponent(key))).replace(/=/g,"");
-      wrap.innerHTML = `
-        <input type="checkbox" id="${id}" ${checked ? "checked" : ""} />
-        <label for="${id}">${t(item)}</label>
-      `;
-      wrap.querySelector("input").addEventListener("change", e => {
-        state.shopping[key] = e.target.checked;
-        saveState();
-      });
-      div.appendChild(wrap);
-    });
-    c.appendChild(div);
-  });
-}
-document.getElementById("shopResetBtn").addEventListener("click", () => {
-  if (!confirm(t(UI.shop_reset_confirm))) return;
-  state.shopping = {}; saveState(); renderShopping();
-});
-document.getElementById("shopCheckAllBtn").addEventListener("click", () => {
-  SHOPPING.forEach(cat => cat.items.forEach(it => { state.shopping[it.ar] = true; }));
-  saveState(); renderShopping();
-});
-
-// ---------- ALLOWED ----------
-function renderAllowed() {
-  document.getElementById("vegPills").innerHTML = VEGETABLES.map(v => `<li>${t(v)}</li>`).join("");
-  document.getElementById("drinksPills").innerHTML = DRINKS.map(d => `<li>${t(d)}</li>`).join("");
-  document.getElementById("saucesTable").innerHTML = SAUCES.map(s =>
-    `<tr><td>${t(s.name)}</td><td>${t(s.qty)}</td></tr>`
-  ).join("");
-  document.getElementById("fatTable").innerHTML = FAT_EXCHANGE.map(([n,q]) =>
-    `<tr><td>${t(n)}</td><td>${t(q)}</td></tr>`
-  ).join("");
-}
-
-// ---------- WEIGHT ----------
-document.getElementById("weightDate").value = today();
-document.getElementById("addWeight").addEventListener("click", () => {
-  const date = document.getElementById("weightDate").value;
-  const kg = parseFloat(document.getElementById("weightInput").value);
-  if (!date || !kg || isNaN(kg)) { alert(t(UI.date_value_invalid)); return; }
-  state.weights = state.weights.filter(w => w.date !== date);
-  state.weights.push({ date, kg });
-  state.weights.sort((a,b) => a.date.localeCompare(b.date));
-  saveState();
-  document.getElementById("weightInput").value = "";
-  renderWeight();
-});
-
-function renderWeight() {
-  const entries = document.getElementById("weightEntries");
-  if (state.weights.length === 0) {
-    document.getElementById("currentWeight").textContent = "—";
-    document.getElementById("weightLost").textContent = "—";
-    document.getElementById("toGoal").textContent = "—";
-    entries.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">${ICONS.chartLine}</div>
-        <h4>${t(UI.empty_weight_title)}</h4>
-        <p>${t(UI.empty_weight_sub)}</p>
-      </div>`;
-    renderWeightChart();
-    return;
-  }
-  {
-    const last = state.weights[state.weights.length - 1];
-    const first = state.weights[0];
-    document.getElementById("currentWeight").textContent = last.kg.toFixed(1);
-    document.getElementById("weightLost").textContent = (first.kg - last.kg).toFixed(1);
-    document.getElementById("toGoal").textContent = Math.max(0, (last.kg - PERSON.ibw)).toFixed(1);
-  }
-  entries.innerHTML = "";
-  [...state.weights].reverse().forEach(w => {
-    const row = document.createElement("div");
-    row.className = "weight-row";
-    row.innerHTML = `
-      <span>${formatDate(w.date)}</span>
-      <span><strong>${w.kg.toFixed(1)} ${t(UI.kg)}</strong>
-        <button class="del" data-date="${w.date}" aria-label="Delete entry">${ICONS.trash}</button>
-      </span>
-    `;
-    entries.appendChild(row);
-  });
-  entries.querySelectorAll(".del").forEach(b => {
-    b.addEventListener("click", () => {
-      state.weights = state.weights.filter(w => w.date !== b.dataset.date);
-      saveState(); renderWeight(); renderWeightChart();
-    });
-  });
-  renderWeightChart();
-}
-let chartInstance = null;
-function renderWeightChart() {
-  if (!window.Chart) return;
-  const ctx = document.getElementById("weightChart");
-  if (!ctx) return;
-  if (chartInstance) chartInstance.destroy();
-  const labels = state.weights.map(w => w.date.slice(5));
-  const data = state.weights.map(w => w.kg);
-  const ibwLine = state.weights.map(() => PERSON.ibw);
-  chartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: t(UI.chart_weight), data, borderColor:"#d62828", backgroundColor:"rgba(214,40,40,.1)", tension:.3, fill:true },
-        { label: t(UI.chart_goal), data: ibwLine, borderColor:"#2d6a4f", borderDash:[6,4], fill:false, pointRadius:0 }
-      ]
-    },
-    options: { responsive:true, plugins:{ legend:{ position:"bottom" } } }
+  $("progress").addEventListener("click", e => {
+    const w = e.target.closest("[data-del-weight]");
+    const z = e.target.closest("[data-del-waist]");
+    if (w) state.weights = state.weights.filter(x => x.date !== w.dataset.delWeight);
+    else if (z) state.waists = state.waists.filter(x => x.date !== z.dataset.delWaist);
+    else return;
+    save(); renderProgress();
   });
 }
 
-// ---------- CALENDAR ----------
+// ============================================================
+// CALENDAR
+// ============================================================
+const AR_DOW = ["ن","ث","ر","خ","ج","س","ح"];
+const EN_DOW = ["M","T","W","T","F","S","S"];
 function renderCalendar() {
-  const grid = document.getElementById("calendarGrid");
-  grid.innerHTML = "";
-  if (!state.startDate) {
-    grid.innerHTML = `<div style="grid-column:1/-1" class="note">${t(UI.cal_no_start)}</div>`;
-    return;
+  const [y, m] = calMonth.split("-").map(Number);
+  $("monthLabel").textContent = monthName(m - 1) + " " + y;
+  const first = isoOf(new Date(y, m - 1, 1));
+  const daysIn = new Date(y, m, 0).getDate();
+  const lead = planIdx(first);
+  const now = todayIso();
+  let h = (lang === "ar" ? AR_DOW : EN_DOW).map(x => '<div class="cal-dow">' + x + "</div>").join("");
+  for (let i = 0; i < lead; i++) h += '<div class="cal-cell empty"></div>';
+  for (let dnum = 1; dnum <= daysIn; dnum++) {
+    const iso = isoOf(new Date(y, m - 1, dnum));
+    const future = iso > now;
+    const before = iso < state.startDate;
+    let lvl = "none", sc = 0;
+    if (!future && !before && state.days[iso]) {
+      sc = score(iso);
+      lvl = sc >= 8 ? "4" : sc >= GOOD_DAY ? "3" : sc >= 5 ? "2" : sc >= 1 ? "1" : "0";
+    }
+    const disabled = future || before;
+    h += '<button type="button" class="cal-cell" data-level="' + lvl + '"' + (iso === now ? ' data-today="1"' : "") +
+      (disabled ? " disabled" : ' data-cal="' + iso + '"') + ' aria-label="' + esc(formatDate(iso)) + (lvl !== "none" ? ", " + sc + "/9" : "") + '">' +
+      "<span>" + dnum + "</span>" + (lvl !== "none" ? '<small>' + sc + "</small>" : "") + "</button>";
   }
-  const start = new Date(state.startDate);
-  const todayIso = today();
-  for (let i = 0; i < PERSON.durationDays; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    const iso = d.toISOString().slice(0,10);
-    const dd = state.days[iso];
-    let score = 0;
-    if (dd) score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
-    const cheatCount = (state.cheats[iso] || []).length;
-    const cell = document.createElement("div");
-    cell.className = "cal-day";
-    cell.dataset.score = score;
-    cell.innerHTML = `<span class="cal-day-num">${localizedNumber(i+1)}</span>${cheatCount ? '<span class="cal-cheat-dot" aria-hidden="true"></span>' : ""}`;
-    if (iso === todayIso) cell.classList.add("today");
-    if (iso > todayIso) cell.classList.add("future");
-    if (cheatCount) cell.classList.add("has-cheat");
-    cell.title = `${iso} — ${score}/6${cheatCount ? ` · ${cheatCount} cheat${cheatCount>1?"s":""}` : ""}`;
-    cell.addEventListener("click", () => {
-      if (iso > todayIso) return;
-      showDayDetails(iso, i+1);
-    });
-    grid.appendChild(cell);
-  }
+  $("calGrid").innerHTML = h;
+  $("nextMonth").disabled = calMonth >= now.slice(0, 7);
 }
-function showDayDetails(iso, dayNum) {
-  const dd = ensureDay(iso);
-  const isToday = iso === today();
-  document.getElementById("modalTitle").textContent = `${t(UI.day_label)} ${localizedNumber(dayNum)} — ${formatDate(iso)}`;
-  document.getElementById("modalPickAgain").style.display = "none";
-  document.getElementById("modalBody").innerHTML = `
-    <div class="edit-day">
-      <div class="edit-day-section">
-        <div class="edit-day-label">💧 <span>${t(UI.water_header)}</span> <span class="edit-day-count" id="editWaterCount">${localizedNumber(dd.water)}/8</span></div>
-        <div class="water-tracker" id="editWaterTracker"></div>
-      </div>
-      <div class="edit-day-section">
-        <div class="edit-day-label">🍽️ <span>${t(UI.meals_today)}</span></div>
-        <div id="editMeals"></div>
-      </div>
-      <div class="edit-day-section">
-        <div class="edit-day-label">🍩 <span>${t(UI.cheat_day_modal_label)}</span></div>
-        <div id="editCheats"></div>
-      </div>
-    </div>
-  `;
-
-  const onChange = () => {
-    saveState();
+function bindCalendar() {
+  const shift = n => {
+    const [y, m] = calMonth.split("-").map(Number);
+    calMonth = isoOf(new Date(y, m - 1 + n, 1)).slice(0, 7);
     renderCalendar();
-    if (isToday) renderToday();
-    renderInsights();
-    maybeCelebrateStreak();
   };
-  const renderEditWater = () => {
-    document.getElementById("editWaterCount").textContent = `${localizedNumber(dd.water)}/8`;
-    const wt = document.getElementById("editWaterTracker");
-    wt.innerHTML = "";
-    for (let i = 1; i <= 8; i++) {
-      const cup = document.createElement("button");
-      cup.type = "button";
-      cup.className = "water-cup" + (i <= dd.water ? " filled" : "");
-      cup.setAttribute("aria-label", `Cup ${i} of 8`);
-      cup.setAttribute("aria-pressed", i <= dd.water ? "true" : "false");
-      cup.addEventListener("click", () => {
-        dd.water = dd.water >= i ? i - 1 : i;
-        onChange();
-        renderEditWater();
-      });
-      wt.appendChild(cup);
-    }
-  };
-  const renderEditMeals = () => {
-    const order = [
-      ["breakfast","meal_breakfast"],
-      ["snack1","meal_snack1"],
-      ["lunch","meal_lunch"],
-      ["snack2","meal_snack2"],
-      ["dinner","meal_dinner"]
-    ];
-    const div = document.getElementById("editMeals");
-    div.innerHTML = "";
-    order.forEach(([k, uiKey]) => {
-      const done = !!dd.meals[k];
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "meal-toggle" + (done ? " done" : "");
-      btn.setAttribute("aria-pressed", done ? "true" : "false");
-      btn.innerHTML = `<span>${t(UI[uiKey])}</span><span>${done ? "✅" : "⬜"}</span>`;
-      btn.addEventListener("click", () => {
-        dd.meals[k] = !dd.meals[k];
-        onChange();
-        renderEditMeals();
-      });
-      div.appendChild(btn);
-    });
-  };
-  const renderEditCheats = () => {
-    const div = document.getElementById("editCheats");
-    if (!div) return;
-    const list = state.cheats[iso] || [];
-    if (list.length === 0) {
-      div.innerHTML = `<div class="cheat-day-empty">${t(UI.cheat_day_none)}</div>`;
-      return;
-    }
-    div.innerHTML = list.map(c => `
-      <div class="cheat-entry kind-${c.kind}">
-        <div class="cheat-entry-head">
-          <span class="cheat-badge ${c.kind}">${t(UI["cheat_kind_" + c.kind])}</span>
-          <span class="cheat-entry-name">${formatCheatTitle(c)}</span>
-          <button class="cheat-del" data-cheat-del="${c.id}" aria-label="Delete">${ICONS.x}</button>
-        </div>
-        ${c.qty ? `<div class="cheat-entry-meta">${t(UI.cheat_qty)}: ${escapeHtml(c.qty)}</div>` : ""}
-        ${c.note ? `<div class="cheat-entry-note">${escapeHtml(c.note)}</div>` : ""}
-      </div>
-    `).join("");
-    div.querySelectorAll("[data-cheat-del]").forEach(b => {
-      b.addEventListener("click", () => {
-        if (!confirm(t(UI.cheat_delete_confirm))) return;
-        deleteCheat(iso, b.dataset.cheatDel);
-        renderEditCheats();
-        renderCalendar();
-        renderCheatsTab();
-        if (isToday) renderToday();
-      });
-    });
-  };
-
-  renderEditWater();
-  renderEditMeals();
-  renderEditCheats();
-  document.getElementById("modal").classList.add("show");
-}
-
-// ---------- FAVORITES ----------
-function renderFavorites() {
-  const all = [...BREAKFAST, ...LUNCH, ...DINNER, ...SNACK1, ...SNACK2];
-  const favs = all.filter(m => state.favorites.includes(m.id));
-  const c = document.getElementById("favoritesList");
-  if (favs.length === 0) {
-    c.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">${ICONS.heart}</div>
-        <h4>${t(UI.empty_favs_title)}</h4>
-        <p>${t(UI.empty_favs_sub)}</p>
-      </div>`;
-    return;
-  }
-  c.innerHTML = "";
-  favs.forEach(m => {
-    const div = document.createElement("div");
-    div.className = "option fav";
-    const title = m.title ? ` — ${t(m.title)}` : "";
-    div.innerHTML = `
-      <div class="option-header">
-        <div class="option-title">${mealCategoryOf(m.id)} — ${t(UI.option_label)} ${t(m.num)}${title}</div>
-        <button class="fav-btn active" data-fav="${m.id}" aria-label="Remove favorite">${ICONS.heartFilled}</button>
-      </div>
-      <div class="option-body">
-        <ul>${m.items.map(x => `<li>${t(x)}</li>`).join("")}</ul>
-      </div>
-    `;
-    c.appendChild(div);
-  });
-  c.querySelectorAll("[data-fav]").forEach(b => {
-    b.addEventListener("click", () => {
-      const id = b.dataset.fav;
-      state.favorites = state.favorites.filter(x => x !== id);
-      saveState(); renderFavorites(); renderAllMealLists();
-    });
+  $("prevMonth").addEventListener("click", () => shift(-1));
+  $("nextMonth").addEventListener("click", () => shift(1));
+  $("calGrid").addEventListener("click", e => {
+    const b = e.target.closest("[data-cal]");
+    if (!b) return;
+    viewDate = b.dataset.cal;
+    switchToTab("today");
   });
 }
-function mealCategoryOf(id) {
-  if (id.startsWith("b")) return "🍳 " + t(UI.meal_breakfast);
-  if (id.startsWith("l")) return "🍽️ " + t(UI.meal_lunch);
-  if (id.startsWith("d")) return "🌙 " + t(UI.meal_dinner);
-  if (id.startsWith("s1")) return "🥤 " + t(UI.meal_snack1);
-  if (id.startsWith("s2")) return "🥜 " + t(UI.meal_snack2);
-  return "";
+
+// ============================================================
+// GUIDE
+// ============================================================
+function renderGuide() {
+  const pr = profile();
+  $("guideGoal").textContent = t(GOAL);
+  const stat = (lbl, val) => '<div class="stat"><span class="stat-val"><bdi>' + esc(val) + '</bdi></span><span class="stat-lbl">' + esc(lbl) + "</span></div>";
+  $("guideDetails").innerHTML =
+    stat(tUI("age"), pr.age + " " + tUI("years")) +
+    stat(tUI("height").replace(/ \(.*\)/, ""), pr.height + " " + u("cm")) +
+    stat(tUI("start_weight").replace(/ \(.*\)/, ""), num(pr.startWeight, 1) + " " + u("kg")) +
+    stat("", t(pr.condition)) +
+    stat("", t(pr.medication));
+  const T = TARGETS;
+  const row = (k, T, unit) => "<tr><td>" + esc(tUI(k)) + "</td><td><bdi>" + rangeLabel(T.min.toLocaleString("en"), T.max.toLocaleString("en")) + " " + esc(u(unit)) + "</bdi></td></tr>";
+  $("guideTargets").innerHTML = "<table><thead><tr><th>" + esc(tUI("col_nutrient")) + "</th><th>" + esc(tUI("col_target")) + "</th></tr></thead><tbody>" +
+    row("ck_kcal", T.kcal, "kcal") + row("ck_protein", T.protein, "g") + row("carbs", T.carbs, "g") + row("fat", T.fat, "g") + row("ck_fiber", T.fiber, "g") +
+    "<tr><td>" + esc(tUI("ck_water")) + "</td><td><bdi>2-2.5 " + esc(u("L")) + "</bdi></td></tr></tbody></table>";
+  $("targetsNote").textContent = t(TARGETS_NOTE);
+  $("guideStructure").innerHTML = "<table><tbody>" + SLOTS.map(s => "<tr><td>" + esc(t(s.name)) + "</td><td><bdi>" + s.kcal[0] + "-" + s.kcal[1] + " " + esc(u("kcal")) + "</bdi></td></tr>").join("") +
+    "</tbody></table><p class=\"hint\">" + esc(t(EXTRA_NOTE)) + "</p>";
+  $("guideRules").innerHTML = RULES.map(r => "<li>" + esc(t(r)) + "</li>").join("");
+  $("metforminNote").textContent = t(METFORMIN_NOTE);
+  $("guidePortions").textContent = t(PORTION_RULES);
+  $("guideProgress").textContent = t(PROGRESS.note);
 }
 
-// ---------- PHOTOS ----------
-const PHOTO_MEALS = [
-  ["breakfast", "🍳", "meal_breakfast"],
-  ["lunch",     "🍽️", "meal_lunch"],
-  ["dinner",    "🌙", "meal_dinner"],
-  ["snack1",    "🥤", "meal_snack1"],
-  ["snack2",    "🥜", "meal_snack2"]
-];
-function renderPhotoMealButtons() {
-  const host = document.getElementById("photoMealButtons");
-  if (!host) return;
-  host.innerHTML = "";
-  PHOTO_MEALS.forEach(([key, icon, uiKey]) => {
-    const label = document.createElement("label");
-    label.className = "photo-upload photo-upload-meal";
-    label.dataset.meal = key;
-    label.innerHTML = `<span>${icon} ${t(UI[uiKey])}</span><input type="file" accept="image/*" capture="environment" />`;
-    label.querySelector("input").addEventListener("change", async e => {
-      const file = e.target.files[0]; if (!file) return;
-      const compressed = await compressImage(file, 800);
-      state.photos.push({ id: Date.now().toString(), date: today(), meal: key, data: compressed });
-      try { saveState(); renderPhotos(); }
-      catch (err) { alert(t(UI.photo_full)); state.photos.pop(); }
+// ============================================================
+// SETTINGS
+// ============================================================
+const LABEL_FOODS = Object.keys(FOODS).filter(k => FOODS[k].label);
+function renderSettings() {
+  $("startDateInput").value = state.startDate;
+  const pr = profile();
+  $("pAge").value = pr.age;
+  $("pHeight").value = pr.height;
+  $("pWeight").value = pr.startWeight;
+  $("labelForms").innerHTML = LABEL_FOODS.map(id => {
+    const f = food(id);
+    const field = (k) => '<label><span>' + esc(tUI("l_" + k)) + '</span><input type="number" step="0.1" min="0" data-label="' + id + '" data-k="' + k + '" value="' + f[k] + '"></label>';
+    return '<div class="label-food"><h4>' + esc(cap(t(f.name))) + ' <span class="muted">/ 100 ' + esc(u(f.unit)) + "</span></h4>" +
+      '<div class="form-grid four">' + field("kcal") + field("p") + field("c") + field("f") + "</div></div>";
+  }).join("");
+}
+function bindSettings() {
+  $("saveStart").addEventListener("click", () => {
+    const v = $("startDateInput").value;
+    if (!v) return;
+    state.startDate = v > todayIso() ? todayIso() : v;
+    save(); renderAll(); toast(tUI("saved"));
+  });
+  $("saveProfile").addEventListener("click", () => {
+    const n = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+    state.profile = { age: n("pAge"), height: n("pHeight"), startWeight: n("pWeight") };
+    save(); renderAll(); toast(tUI("saved"));
+  });
+  $("saveLabels").addEventListener("click", () => {
+    const labels = {};
+    document.querySelectorAll("[data-label]").forEach(inp => {
+      const id = inp.dataset.label, k = inp.dataset.k, v = parseFloat(inp.value);
+      if (isNaN(v) || v === FOODS[id][k]) return;
+      labels[id] = labels[id] || {};
+      labels[id][k] = v;
+    });
+    state.labels = labels;
+    save(); renderAll(); toast(tUI("saved"));
+  });
+  $("resetLabels").addEventListener("click", () => { state.labels = {}; save(); renderAll(); });
+  $("exportData").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "lynn-plan-backup-" + todayIso() + ".json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $("importData").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (!data || typeof data !== "object" || typeof data.days !== "object") throw new Error("bad");
+        state = Object.assign(defaultState(), data);
+        save(); renderAll(); toast(tUI("imported"));
+      } catch (err) { toast(tUI("import_bad")); }
       e.target.value = "";
-    });
-    host.appendChild(label);
-  });
-}
-function compressImage(file, maxWidth) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const scale = Math.min(1, maxWidth / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.75));
-      };
-      img.src = reader.result;
     };
-    reader.readAsDataURL(file);
+    r.readAsText(file);
   });
-}
-function renderPhotos() {
-  const grid = document.getElementById("photoGrid");
-  grid.innerHTML = "";
-  if (state.photos.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">${ICONS.camera}</div>
-        <h4>${t(UI.empty_photos_title)}</h4>
-        <p>${t(UI.empty_photos_sub)}</p>
-      </div>`;
-    return;
-  }
-  const MEAL_META = Object.fromEntries(PHOTO_MEALS.map(([k, icon, uiKey]) => [k, { icon, uiKey }]));
-  const byDate = {};
-  state.photos.forEach(p => { (byDate[p.date] = byDate[p.date] || []).push(p); });
-  const dates = Object.keys(byDate).sort().reverse();
-  dates.forEach(date => {
-    const group = document.createElement("div");
-    group.className = "photo-date-group";
-    const header = document.createElement("div");
-    header.className = "photo-date-header";
-    header.textContent = formatDate(date);
-    group.appendChild(header);
-    const inner = document.createElement("div");
-    inner.className = "photo-grid-inner";
-    byDate[date].slice().reverse().forEach(p => {
-      const meta = p.meal && MEAL_META[p.meal];
-      const badge = meta
-        ? `<div class="meal-badge">${meta.icon} ${t(UI[meta.uiKey])}</div>`
-        : "";
-      const div = document.createElement("div");
-      div.className = "photo-item";
-      div.innerHTML = `<img src="${p.data}" alt="Meal photo from ${p.date}" />${badge}<button class="del" data-id="${p.id}" aria-label="Delete photo">${ICONS.x}</button>`;
-      inner.appendChild(div);
-    });
-    group.appendChild(inner);
-    grid.appendChild(group);
-  });
-  grid.querySelectorAll(".del").forEach(b => {
-    b.addEventListener("click", () => {
-      if (!confirm(t(UI.photo_delete_confirm))) return;
-      state.photos = state.photos.filter(p => p.id !== b.dataset.id);
-      saveState(); renderPhotos();
-    });
+  $("resetAll").addEventListener("click", () => {
+    if (!confirm(tUI("reset_confirm"))) return;
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+    location.reload();
   });
 }
 
-// ---------- SETTINGS ----------
-document.getElementById("startDateInput").value = state.startDate || today();
-document.getElementById("saveStartDate").addEventListener("click", () => {
-  const v = document.getElementById("startDateInput").value;
-  if (!v) { alert(t(UI.choose_date)); return; }
-  state.startDate = v;
-  saveState(); renderToday(); renderCalendar(); renderStartDateDisplay();
-  alert(t(UI.start_saved));
-});
-function renderStartDateDisplay() {
-  const setter = document.getElementById("startDateSetter");
-  const locked = document.getElementById("startDateLocked");
-  const lockedVal = document.getElementById("startDateLockedValue");
-  if (!setter || !locked) return;
-  if (state.startDate) {
-    setter.style.display = "none";
-    locked.style.display = "block";
-    lockedVal.textContent = formatDate(state.startDate);
-  } else {
-    setter.style.display = "";
-    locked.style.display = "none";
-  }
-}
-// Re-open the date picker when the user wants to correct the start date.
-function bindStartDateEdit() {
-  const btn = document.getElementById("editStartDateBtn");
-  if (!btn || btn.dataset.bound) return;
-  btn.dataset.bound = "1";
-  btn.addEventListener("click", () => {
-    const setter = document.getElementById("startDateSetter");
-    const locked = document.getElementById("startDateLocked");
-    const input = document.getElementById("startDateInput");
-    if (input && state.startDate) input.value = state.startDate;
-    setter.style.display = "";
-    locked.style.display = "none";
+// ============================================================
+// Shell: tabs, language, header
+// ============================================================
+function switchToTab(name) {
+  document.querySelectorAll(".tab").forEach(tb => {
+    const on = tb.dataset.tab === name;
+    tb.classList.toggle("active", on);
+    tb.setAttribute("aria-selected", on ? "true" : "false");
   });
+  document.querySelectorAll("main > section").forEach(s => s.classList.toggle("active", s.id === name));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (name === "today") renderToday();
+  if (name === "progress") renderCharts();
+  if (name === "calendar") renderCalendar();
+  if (name === "move") renderMove();
 }
-function renderPersonInfo() {
-  const c = document.getElementById("personInfo");
-  const fields = [
-    { key:"name",             uiKey:"info_name",     type:"text"   },
-    { key:"weight",           uiKey:"info_weight",   type:"number", step:"0.1", unit:"kg" },
-    { key:"height",           uiKey:"info_height",   type:"number", step:"0.1", unit:"cm" },
-    { key:"age",              uiKey:"info_age",      type:"number", step:"1",   unit:"years" },
-    { key:"ibw",              uiKey:"info_ibw",      type:"number", step:"0.1", unit:"kg" },
-    { key:"waterCupsPerDay",  uiKey:"info_water",    type:"number", step:"1",   unit:"cups_day" },
-    { key:"durationDays",     uiKey:"info_duration", type:"number", step:"1",   unit:"days" }
-  ];
-  c.innerHTML = `
-    <div class="person-form">
-      ${fields.map(f => `
-        <div class="person-field">
-          <label for="pf-${f.key}">${t(UI[f.uiKey])}</label>
-          <div class="person-input-wrap">
-            <input type="${f.type}" id="pf-${f.key}" data-pkey="${f.key}" value="${PERSON[f.key] ?? ""}"${f.step ? ` step="${f.step}"` : ""} />
-            ${f.unit ? `<span class="person-unit">${t(UI[f.unit])}</span>` : ""}
-          </div>
-        </div>
-      `).join("")}
-      <div class="person-bmi">
-        <span>${t(UI.info_bmi)}</span>
-        <strong id="pf-bmi-display">${PERSON.bmi ?? "—"}</strong>
-        <span class="text-muted">(${t(UI.person_bmi_auto)})</span>
-      </div>
-      <button class="btn btn-primary" id="savePersonBtn">${t(UI.btn_save_person)}</button>
-    </div>
-  `;
-  const recalcBmi = () => {
-    const w = parseFloat(document.getElementById("pf-weight").value);
-    const h = parseFloat(document.getElementById("pf-height").value);
-    const out = document.getElementById("pf-bmi-display");
-    if (w > 0 && h > 0) out.textContent = (w / Math.pow(h/100, 2)).toFixed(2);
-    else out.textContent = "—";
-  };
-  document.getElementById("pf-weight").addEventListener("input", recalcBmi);
-  document.getElementById("pf-height").addEventListener("input", recalcBmi);
-
-  document.getElementById("savePersonBtn").addEventListener("click", () => {
-    const overrides = {};
-    c.querySelectorAll("[data-pkey]").forEach(inp => {
-      const k = inp.dataset.pkey;
-      let v = inp.value.trim();
-      if (v === "") return;
-      if (inp.type === "number") {
-        const n = parseFloat(v);
-        if (Number.isNaN(n)) return;
-        v = n;
-      }
-      overrides[k] = v;
-    });
-    if (overrides.weight && overrides.height) {
-      const m = overrides.height / 100;
-      overrides.bmi = +(overrides.weight / (m * m)).toFixed(2);
-    }
-    state.person = overrides;
-    Object.assign(PERSON, overrides);
-    saveState();
-    renderAll();
-    toast(t(UI.person_saved));
+function renderHeader() {
+  const n = daysBetween(state.startDate, todayIso());
+  $("weekBadge").textContent = n >= 0 ? tUI("weekBadge", { w: Math.floor(n / 7) + 1, d: n + 1 }) : "";
+}
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.title = tUI("docTitle");
+  $("langToggle").textContent = tUI("btn_lang");
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const txt = tUI(el.dataset.i18n);
+    if (el.dataset.icon) el.innerHTML = icon(el.dataset.icon) + '<span class="tab-label">' + esc(txt) + "</span>";
+    else el.textContent = txt;
   });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = tUI(el.dataset.i18nPlaceholder); });
+  const back = lang === "ar" ? "chevR" : "chevL", fwd = lang === "ar" ? "chevL" : "chevR";
+  ["prevDay", "prevMonth"].forEach(id => { $(id).innerHTML = icon(back); });
+  ["nextDay", "nextMonth"].forEach(id => { $(id).innerHTML = icon(fwd); });
+  renderAll();
 }
-document.getElementById("exportData").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = `lynn-keto-${today()}.json`; a.click();
-  URL.revokeObjectURL(url);
-});
-document.getElementById("importData").addEventListener("change", async e => {
-  const file = e.target.files[0]; if (!file) return;
-  try {
-    const data = JSON.parse(await file.text());
-    if (!confirm(t(UI.import_confirm))) return;
-    state = { ...defaultState(), ...data };
-    saveState(); location.reload();
-  } catch { alert(t(UI.invalid_file)); }
-});
-document.getElementById("printBtn").addEventListener("click", doPrint);
-document.getElementById("resetAll").addEventListener("click", () => {
-  if (!confirm(t(UI.reset_confirm1))) return;
-  if (!confirm(t(UI.reset_confirm2))) return;
-  localStorage.removeItem(LS_KEY); state = defaultState(); saveState(); location.reload();
-});
+function renderAll() {
+  renderHeader();
+  renderExtraSelect();
+  renderToday();
+  renderPlan();
+  renderSwaps();
+  renderShop();
+  renderMove();
+  renderProgress();
+  renderCalendar();
+  renderGuide();
+  renderSettings();
+}
 
-// ---------- Language toggle button ----------
-document.getElementById("langToggle").addEventListener("click", () => {
+document.querySelectorAll(".tab").forEach(tb => tb.addEventListener("click", () => switchToTab(tb.dataset.tab)));
+$("planDays").addEventListener("click", e => {
+  const b = e.target.closest("[data-day]");
+  if (!b) return;
+  planDay = +b.dataset.day;
+  renderPlan();
+});
+$("langToggle").addEventListener("click", () => {
   lang = lang === "ar" ? "en" : "ar";
-  localStorage.setItem(LANG_KEY, lang);
+  lsSet(LANG_KEY, lang);
   applyLanguage();
 });
-
-// ---------- Weekly insights ----------
-function renderInsights() {
-  const card = document.getElementById("insightsCard");
-  const grid = document.getElementById("insightsGrid");
-  if (!card || !grid) return;
-  if (!state.startDate) { card.hidden = true; return; }
-
-  // Last 7 days (inclusive of today)
-  const now = new Date(today());
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0,10));
-  }
-  let daysComplete = 0;
-  let waterTotal = 0;
-  let hasAnyData = false;
-  days.forEach(iso => {
-    const dd = state.days[iso];
-    if (!dd) return;
-    hasAnyData = true;
-    const m = Object.values(dd.meals).filter(Boolean).length;
-    if (m >= 4 && dd.water >= 6) daysComplete++;
-    waterTotal += dd.water;
-  });
-  if (!hasAnyData) { card.hidden = true; return; }
-  card.hidden = false;
-
-  // Weight delta across the 7-day window
-  let weightDelta = "—";
-  if (state.weights.length >= 2) {
-    const weekAgo = days[0];
-    const earlier = state.weights.filter(w => w.date <= weekAgo).pop()
-                 || state.weights[0];
-    const latest = state.weights[state.weights.length - 1];
-    if (latest && earlier && latest.date !== earlier.date) {
-      const diff = latest.kg - earlier.kg;
-      weightDelta = (diff >= 0 ? "+" : "") + diff.toFixed(1) + " " + t(UI.kg);
-    }
-  }
-
-  grid.innerHTML = `
-    <div class="insights-item"><span class="insights-val">${daysComplete}/7</span><span class="insights-lbl">${t(UI.insights_days)}</span></div>
-    <div class="insights-item"><span class="insights-val">${waterTotal}</span><span class="insights-lbl">${t(UI.insights_water)}</span></div>
-    <div class="insights-item"><span class="insights-val">${weightDelta}</span><span class="insights-lbl">${t(UI.insights_weight_change)}</span></div>
-  `;
-}
-
-// ---------- CHEATS ----------
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-
-function mealOptionLabel(m) {
-  if (m.title) return t(m.title);
-  return m.items.map(x => t(x)).join(" · ");
-}
-
-const CHEAT_EXCESS_CATEGORIES = [
-  { key:"veg",       label:"cheat_cat_veg",     items: () => VEGETABLES.map((v,i) => ({ id:"veg-"+i, label: t(v) })) },
-  { key:"sauces",    label:"cheat_cat_sauces",  items: () => SAUCES.map((s,i)     => ({ id:"sauce-"+i, label: t(s.name) })) },
-  { key:"drinks",    label:"cheat_cat_drinks",  items: () => DRINKS.map((d,i)     => ({ id:"drink-"+i, label: t(d) })) },
-  { key:"fats",      label:"cheat_cat_fats",    items: () => FAT_EXCHANGE.map(([n],i) => ({ id:"fat-"+i, label: t(n) })) },
-  { key:"breakfast", label:"meal_breakfast",    items: () => BREAKFAST.map(m => ({ id:m.id, label: mealOptionLabel(m) })) },
-  { key:"lunch",     label:"meal_lunch",        items: () => LUNCH.map(m     => ({ id:m.id, label: mealOptionLabel(m) })) },
-  { key:"dinner",    label:"meal_dinner",       items: () => DINNER.map(m    => ({ id:m.id, label: mealOptionLabel(m) })) },
-  { key:"snack1",    label:"meal_snack1",       items: () => SNACK1.map(m    => ({ id:m.id, label: mealOptionLabel(m) })) },
-  { key:"snack2",    label:"meal_snack2",       items: () => SNACK2.map(m    => ({ id:m.id, label: mealOptionLabel(m) })) }
-];
-const CHEAT_CAT_BY_KEY = Object.fromEntries(CHEAT_EXCESS_CATEGORIES.map(c => [c.key, c]));
-
-function formatCheatTitle(c) {
-  if (c.kind === "banned") return escapeHtml(c.name || "—");
-  // excess: stored category key + label snapshot
-  return escapeHtml(c.name || "—");
-}
-
-function totalCheats() {
-  return Object.values(state.cheats).reduce((sum, list) => sum + list.length, 0);
-}
-function cheatsInLastDays(n) {
-  const now = new Date(today());
-  let count = 0;
-  for (let i = 0; i < n; i++) {
-    const d = new Date(now); d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0,10);
-    count += (state.cheats[iso] || []).length;
-  }
-  return count;
-}
-function cleanDaysIn28() {
-  if (!state.startDate) return 0;
-  const start = new Date(state.startDate);
-  const todayIso = today();
-  let clean = 0;
-  for (let i = 0; i < PERSON.durationDays; i++) {
-    const d = new Date(start); d.setDate(d.getDate() + i);
-    const iso = d.toISOString().slice(0,10);
-    if (iso > todayIso) continue;
-    if (!(state.cheats[iso] || []).length) clean++;
-  }
-  return clean;
-}
-
-function deleteCheat(iso, id) {
-  const list = state.cheats[iso] || [];
-  state.cheats[iso] = list.filter(c => c.id !== id);
-  if (state.cheats[iso].length === 0) delete state.cheats[iso];
-  saveState();
-}
-
-function getCheatKind() {
-  const active = document.querySelector(".cheat-kind-btn.active");
-  return active ? active.dataset.cheatKind : "excess";
-}
-
-function populateExcessCategorySelect() {
-  const cat = document.getElementById("cheatExcessCategory");
-  if (!cat) return;
-  cat.innerHTML = `<option value="">${t(UI.cheat_select_category)}</option>` +
-    CHEAT_EXCESS_CATEGORIES.map(c => `<option value="${c.key}">${t(UI[c.label])}</option>`).join("");
-  populateExcessItemSelect();
-}
-function populateExcessItemSelect() {
-  const itemSel = document.getElementById("cheatExcessItem");
-  const catKey = document.getElementById("cheatExcessCategory")?.value;
-  if (!itemSel) return;
-  if (!catKey) {
-    itemSel.innerHTML = `<option value="">${t(UI.cheat_select_item)}</option>`;
-    itemSel.disabled = true;
-    return;
-  }
-  const cat = CHEAT_CAT_BY_KEY[catKey];
-  const opts = cat.items();
-  itemSel.disabled = false;
-  itemSel.innerHTML = `<option value="">${t(UI.cheat_select_item)}</option>` +
-    opts.map(o => `<option value="${escapeHtml(o.id)}" data-label="${escapeHtml(o.label)}">${escapeHtml(o.label)}</option>`).join("");
-}
-
-function renderCheatsTab() {
-  // Stats card
-  const grid = document.getElementById("cheatStatsGrid");
-  if (grid) {
-    const stats = [
-      [localizedNumber((state.cheats[today()] || []).length), t(UI.cheat_stat_today)],
-      [localizedNumber(cheatsInLastDays(7)), t(UI.cheat_stat_week)],
-      [localizedNumber(totalCheats()), t(UI.cheat_stat_total)],
-      [`${localizedNumber(cleanDaysIn28())}/${localizedNumber(PERSON.durationDays)}`, t(UI.cheat_stat_clean)]
-    ];
-    grid.innerHTML = stats.map(([v,l]) =>
-      `<div class="today-stat"><span class="val">${v}</span><span class="lbl">${l}</span></div>`
-    ).join("");
-  }
-
-  // Recent log: all entries grouped by date desc
-  const list = document.getElementById("cheatLogList");
-  if (!list) return;
-  const dates = Object.keys(state.cheats).filter(d => state.cheats[d].length).sort().reverse();
-  if (dates.length === 0) {
-    list.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">${ICONS.cookie}</div>
-      <h4>${t(UI.cheat_empty_all)}</h4>
-    </div>`;
-    return;
-  }
-  list.innerHTML = dates.map(date => {
-    const entries = state.cheats[date].slice().reverse();
-    return `
-      <div class="cheat-date-group">
-        <div class="cheat-date-header">${formatDate(date)}</div>
-        ${entries.map(c => `
-          <div class="cheat-entry kind-${c.kind}">
-            <div class="cheat-entry-head">
-              <span class="cheat-badge ${c.kind}">${t(UI["cheat_kind_" + c.kind])}</span>
-              <span class="cheat-entry-name">${formatCheatTitle(c)}</span>
-              <button class="cheat-del" data-cheat-del="${c.id}" data-cheat-date="${date}" aria-label="Delete">${ICONS.x}</button>
-            </div>
-            ${c.qty ? `<div class="cheat-entry-meta">${t(UI.cheat_qty)}: ${escapeHtml(c.qty)}</div>` : ""}
-            ${c.note ? `<div class="cheat-entry-note">${escapeHtml(c.note)}</div>` : ""}
-          </div>
-        `).join("")}
-      </div>
-    `;
-  }).join("");
-  list.querySelectorAll("[data-cheat-del]").forEach(b => {
-    b.addEventListener("click", () => {
-      if (!confirm(t(UI.cheat_delete_confirm))) return;
-      deleteCheat(b.dataset.cheatDate, b.dataset.cheatDel);
-      renderCheatsTab();
-      renderCalendar();
-      renderToday();
-    });
-  });
-}
-
-function setupCheatForm() {
-  const dateInput = document.getElementById("cheatDate");
-  if (dateInput && !dateInput.value) dateInput.value = today();
-
-  document.querySelectorAll(".cheat-kind-btn").forEach(b => {
-    if (b.dataset.bound) return;
-    b.dataset.bound = "1";
-    b.addEventListener("click", () => {
-      document.querySelectorAll(".cheat-kind-btn").forEach(x => x.classList.remove("active"));
-      b.classList.add("active");
-      const kind = b.dataset.cheatKind;
-      document.getElementById("cheatExcessFields").hidden = kind !== "excess";
-      document.getElementById("cheatBannedFields").hidden = kind !== "banned";
-    });
-  });
-
-  const catSel = document.getElementById("cheatExcessCategory");
-  if (catSel && !catSel.dataset.bound) {
-    catSel.dataset.bound = "1";
-    catSel.addEventListener("change", populateExcessItemSelect);
-  }
-  populateExcessCategorySelect();
-
-  const logBtn = document.getElementById("cheatLogBtn");
-  if (logBtn && !logBtn.dataset.bound) {
-    logBtn.dataset.bound = "1";
-    logBtn.addEventListener("click", submitCheat);
-  }
-}
-
-function submitCheat() {
-  const kind = getCheatKind();
-  const date = document.getElementById("cheatDate").value || today();
-  const note = document.getElementById("cheatNote").value.trim();
-  let entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), kind, ts: new Date().toISOString(), note };
-
-  if (kind === "excess") {
-    const catKey = document.getElementById("cheatExcessCategory").value;
-    const itemSel = document.getElementById("cheatExcessItem");
-    const itemId = itemSel.value;
-    if (!catKey || !itemId) { alert(t(UI.cheat_select_item)); return; }
-    const label = itemSel.options[itemSel.selectedIndex].dataset.label || itemSel.options[itemSel.selectedIndex].text;
-    entry.category = catKey;
-    entry.itemId = itemId;
-    entry.name = label;
-    entry.qty = document.getElementById("cheatExcessQty").value.trim();
-  } else {
-    const name = document.getElementById("cheatBannedName").value.trim();
-    if (!name) { alert(t(UI.cheat_name_placeholder)); return; }
-    entry.name = name;
-    entry.qty = document.getElementById("cheatBannedQty").value.trim();
-  }
-
-  if (!state.cheats[date]) state.cheats[date] = [];
-  state.cheats[date].push(entry);
-  saveState();
-
-  // Reset inputs
-  document.getElementById("cheatNote").value = "";
-  if (kind === "excess") {
-    document.getElementById("cheatExcessQty").value = "";
-  } else {
-    document.getElementById("cheatBannedName").value = "";
-    document.getElementById("cheatBannedQty").value = "";
-  }
-
-  toast(t(UI.cheat_logged), formatDate(date));
-  renderCheatsTab();
-  renderCalendar();
-  renderToday();
-}
-
-// ---------- PRINT REPORT ----------
-let rptChart = null;
-
-function renderPrintReport() {
-  const host = document.getElementById("printReport");
-  if (!host) return;
-
-  const ws = state.weights.slice().sort((a,b) => a.date.localeCompare(b.date));
-  const first = ws[0];
-  const last = ws[ws.length - 1];
-  const lostKg = (first && last) ? (first.kg - last.kg) : null;
-  const toGoal = last ? Math.max(0, last.kg - PERSON.ibw) : null;
-
-  // Adherence aggregates
-  let mealsLogged = 0, waterTotal = 0, fullDays = 0;
-  Object.values(state.days).forEach(d => {
-    const m = Object.values(d.meals).filter(Boolean).length;
-    mealsLogged += m;
-    waterTotal += d.water || 0;
-    if (m === 5 && d.water >= 8) fullDays++;
-  });
-
-  // Cheat aggregates
-  const cheatDates = Object.keys(state.cheats).filter(d => state.cheats[d].length).sort();
-  let excessCount = 0, bannedCount = 0;
-  cheatDates.forEach(d => state.cheats[d].forEach(c => {
-    if (c.kind === "excess") excessCount++; else bannedCount++;
-  }));
-  const totalCheat = excessCount + bannedCount;
-
-  const fmtKg = v => (v == null ? "—" : v.toFixed(1) + " " + t(UI.kg));
-  const summary = [
-    [t(UI.rpt_starting_w), PERSON.weight + " " + t(UI.kg)],
-    [t(UI.rpt_current_w), last ? last.kg.toFixed(1) + " " + t(UI.kg) : "—"],
-    [t(UI.rpt_lost), lostKg == null ? "—" : (lostKg >= 0 ? "" : "+") + Math.abs(lostKg).toFixed(1) + " " + t(UI.kg)],
-    [t(UI.rpt_goal), PERSON.ibw + " " + t(UI.kg)],
-    [t(UI.rpt_remaining), fmtKg(toGoal)],
-    [t(UI.rpt_streak), `${currentStreak()} ${t(UI.days)}`],
-    [t(UI.rpt_full_days), `${fullDays} ${t(UI.days)}`],
-    [t(UI.rpt_meals_logged), String(mealsLogged)],
-    [t(UI.rpt_water_total), String(waterTotal)],
-    [t(UI.rpt_total_cheats), String(totalCheat)],
-    [t(UI.rpt_clean_days), `${cleanDaysIn28()}/${PERSON.durationDays}`]
-  ];
-
-  // Per-day breakdown (only days with any data)
-  const loggedDays = Object.keys(state.days).sort();
-  let dailyTableHtml = `<p>${t(UI.rpt_no_daily)}</p>`;
-  if (loggedDays.length) {
-    dailyTableHtml = `
-      <table class="rpt-table">
-        <thead><tr>
-          <th>${t(UI.rpt_col_date)}</th>
-          <th>${t(UI.rpt_col_water)}</th>
-          <th>${t(UI.rpt_col_meals)}</th>
-          <th>${t(UI.rpt_col_cheats)}</th>
-        </tr></thead>
-        <tbody>
-          ${loggedDays.map(d => {
-            const dd = state.days[d];
-            const m = Object.values(dd.meals).filter(Boolean).length;
-            const cn = (state.cheats[d] || []).length;
-            return `<tr><td>${d}</td><td>${dd.water || 0}/${PERSON.waterCupsPerDay}</td><td>${m}/5</td><td>${cn}</td></tr>`;
-          }).join("")}
-        </tbody>
-      </table>`;
-  }
-
-  // 28-day adherence grid
-  let calHtml = `<p>${t(UI.rpt_no_start)}</p>`;
-  if (state.startDate) {
-    const start = new Date(state.startDate);
-    const todayIso = today();
-    const cells = [];
-    for (let i = 0; i < PERSON.durationDays; i++) {
-      const d = new Date(start); d.setDate(d.getDate() + i);
-      const iso = d.toISOString().slice(0,10);
-      const dd = state.days[iso];
-      let score = 0;
-      if (dd) score = Object.values(dd.meals).filter(Boolean).length + (dd.water >= 8 ? 1 : 0);
-      const future = iso > todayIso;
-      const cheatN = (state.cheats[iso] || []).length;
-      const water = (dd && !future) ? (dd.water || 0) : null;
-      let bg = "#f3f3f3";
-      if (!future && dd) {
-        if (score >= 6) bg = "#16a34a";
-        else if (score >= 4) bg = "#86efac";
-        else if (score >= 2) bg = "#fde68a";
-        else if (score >= 1) bg = "#fef3c7";
-      }
-      const fg = (score >= 5 && !future) ? "#fff" : "#111";
-      const dot = cheatN ? `<span class="rpt-cell-dot"></span>` : "";
-      const waterStr = water !== null ? `<span class="rpt-cell-water">💧${water}/${PERSON.waterCupsPerDay}</span>` : "";
-      cells.push(`<div class="rpt-cell" style="background:${future ? "#fff" : bg};color:${fg};${future ? "border:1px dashed #ccc;color:#bbb;" : ""}">
-        <span class="rpt-cell-num">${i+1}</span>${waterStr}${dot}
-      </div>`);
-    }
-    calHtml = `<div class="rpt-cal">${cells.join("")}</div>`;
-  }
-
-  // Cheats list
-  let cheatsHtml = `<p class="rpt-clean">${t(UI.rpt_no_cheats)}</p>`;
-  if (cheatDates.length) {
-    cheatsHtml = cheatDates.slice().reverse().map(d => `
-      <div class="rpt-cheat-day">
-        <h4>${formatDate(d)}</h4>
-        <ul>
-          ${state.cheats[d].slice().reverse().map(c => {
-            const tag = c.kind === "excess" ? t(UI.rpt_excess_label) : t(UI.rpt_banned_label);
-            const tagCls = c.kind === "banned" ? "rpt-tag banned" : "rpt-tag excess";
-            return `<li>
-              <span class="${tagCls}">${tag}</span>
-              <strong>${escapeHtml(c.name || "—")}</strong>${c.qty ? ` — ${escapeHtml(c.qty)}` : ""}
-              ${c.note ? `<div class="rpt-cheat-note">${escapeHtml(c.note)}</div>` : ""}
-            </li>`;
-          }).join("")}
-        </ul>
-      </div>
-    `).join("");
-  }
-
-  const dayN = dayNumber();
-  const breakdown = tUI("rpt_cheats_breakdown", { total: totalCheat, excess: excessCount, banned: bannedCount });
-
-  host.innerHTML = `
-    <div class="rpt-head">
-      <h1>${t(UI.rpt_title)} — ${PERSON.name}</h1>
-      <div class="rpt-meta">
-        <span><strong>${t(UI.rpt_printed)}:</strong> ${formatDate(today())}</span>
-        ${state.startDate ? `<span><strong>${t(UI.rpt_start)}:</strong> ${formatDate(state.startDate)}</span>` : ""}
-        ${dayN ? `<span><strong>${t(UI.rpt_day)}:</strong> ${dayN}/${PERSON.durationDays}</span>` : ""}
-      </div>
-    </div>
-
-    <div class="rpt-section">
-      <h2>${t(UI.rpt_summary)}</h2>
-      <div class="rpt-summary-grid">
-        ${summary.map(([l,v]) => `<div class="rpt-stat"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("")}
-      </div>
-    </div>
-
-    <div class="rpt-section">
-      <h2>${t(UI.rpt_weight_section)}</h2>
-      ${ws.length ? `
-        <div class="rpt-chart-wrap"><canvas id="rptWeightChart"></canvas></div>
-        <table class="rpt-table">
-          <thead><tr>
-            <th>${t(UI.rpt_col_date)}</th>
-            <th>${t(UI.rpt_col_weight)}</th>
-            <th>${t(UI.rpt_col_delta)}</th>
-          </tr></thead>
-          <tbody>
-            ${ws.map(w => {
-              const delta = w.kg - first.kg;
-              const sign = delta > 0 ? "+" : "";
-              return `<tr><td>${w.date}</td><td>${w.kg.toFixed(1)}</td><td>${sign}${delta.toFixed(1)}</td></tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      ` : `<p>${t(UI.rpt_weight_none)}</p>`}
-    </div>
-
-    <div class="rpt-section rpt-page-break">
-      <h2>${t(UI.rpt_adherence)}</h2>
-      ${calHtml}
-      <p class="rpt-legend">${t(UI.rpt_legend)}</p>
-    </div>
-
-    <div class="rpt-section">
-      <h2>${t(UI.rpt_daily_section)}</h2>
-      ${dailyTableHtml}
-    </div>
-
-    <div class="rpt-section">
-      <h2>${t(UI.rpt_cheats_section)}</h2>
-      <p class="rpt-breakdown">${breakdown}</p>
-      ${cheatsHtml}
-    </div>
-
-    <div class="rpt-foot">${t(UI.rpt_footer)} · ${formatDate(today())}</div>
-  `;
-
-  // Render weight chart inside the report
-  if (ws.length && window.Chart) {
-    const ctx = document.getElementById("rptWeightChart");
-    if (ctx) {
-      if (rptChart) { rptChart.destroy(); rptChart = null; }
-      rptChart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: ws.map(w => w.date.slice(5)),
-          datasets: [
-            { label: t(UI.chart_weight), data: ws.map(w => w.kg), borderColor: "#111", backgroundColor: "rgba(0,0,0,.06)", tension:.3, fill:true, pointRadius:3, pointBackgroundColor:"#111" },
-            { label: t(UI.chart_goal), data: ws.map(() => PERSON.ibw), borderColor:"#666", borderDash:[4,4], fill:false, pointRadius:0 }
-          ]
-        },
-        options: { responsive:true, animation:false, plugins:{ legend:{ position:"bottom" } } }
-      });
-    }
-  }
-}
-
-function doPrint() {
-  const rpt = document.getElementById("printReport");
-  if (!rpt) return;
-
-  // Stage off-screen with a real width so Chart.js can size the canvas.
-  // (Without a real width the chart paints with zero dimensions and the
-  // whole report collapses to one blank page.)
-  rpt.style.cssText = "display:block;position:fixed;top:-99999px;left:0;width:186mm;background:white;";
-
-  renderPrintReport();
-
-  // Let Chart.js paint, THEN clear the off-screen inline styles so the
-  // element is positioned normally during print. The chart bitmap survives.
-  setTimeout(() => {
-    rpt.style.cssText = "";
-    window.print();
-  }, 200);
-}
-
-// ---------- Render all ----------
-function renderAll() {
-  renderToday();
-  renderAllMealLists();
-  renderShopping();
-  renderAllowed();
-  renderWeight();
-  renderCalendar();
-  renderFavorites();
-  renderPhotoMealButtons();
-  renderPhotos();
-  renderPersonInfo();
-  renderStartDateDisplay();
-  bindStartDateEdit();
-  renderInsights();
-  setupCheatForm();
-  renderCheatsTab();
-}
-
-// ---------- INIT ----------
+bindToday();
+bindShop();
+bindMove();
+bindProgress();
+bindCalendar();
+bindSettings();
 applyLanguage();
 
-// ---------- Service Worker ----------
+// Day rolls over while the app stays open (e.g. PWA left running overnight)
+let lastSeenToday = todayIso();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  const now = todayIso();
+  if (now === lastSeenToday) return;
+  if (viewDate === lastSeenToday || viewDate > now) viewDate = now;
+  lastSeenToday = now;
+  renderAll();
+});
+
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }

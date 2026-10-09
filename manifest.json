@@ -1,15 +1,19 @@
 {
-  "name": "Lynn Keto Diet",
-  "short_name": "Lynn Keto",
-  "description": "متابعة نظام الكيتو الخاص بـ Lynn Hamad",
+  "name": "Lynn's Plan",
+  "short_name": "Lynn's Plan",
+  "description": "Lynn Hamad's diet & workout plan (PCOS + insulin resistance)",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#d62828",
-  "background_color": "#faf7f4",
-  "lang": "ar",
-  "dir": "rtl",
+  "theme_color": "#2F6B5A",
+  "background_color": "#F7F4EE",
+  "lang": "en",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

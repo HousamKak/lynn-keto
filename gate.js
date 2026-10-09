@@ -1,5 +1,5 @@
 // ============================================================
-// Password gate — daily (resets at midnight), logs each login
+// Password gate: daily (resets at midnight), logs each login
 // Password: daisy
 // ============================================================
 (function () {
@@ -61,7 +61,7 @@
     return;
   }
 
-  // Different day (or never) — force re-login
+  // Different day (or never): force re-login
   localStorage.removeItem(UNLOCK_DATE_KEY);
 
   const input = document.getElementById("gateInput");
@@ -79,7 +79,7 @@
       err.textContent = "";
       unlock(true);
     } else {
-      err.textContent = "Wrong password — try again";
+      err.textContent = "Wrong password, try again";
       input.value = "";
       input.focus();
       input.classList.add("shake");
